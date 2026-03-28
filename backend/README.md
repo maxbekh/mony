@@ -1,16 +1,16 @@
 # Backend
 
-Reserved for the Rust/Axum application.
+Rust/Axum application for the `mony` backend.
 
-Initial responsibility:
+Current scope:
 
-- CSV ingestion pipeline
-- Transaction normalization
-- Categorization rules
-- Reporting API
+- service bootstrap
+- configuration loading
+- health and readiness endpoints
+- tracing baseline
 
-The first backend slice should include:
+Immediate next slices:
 
-1. A minimal Axum app with health and readiness endpoints.
-2. Database connectivity and migrations.
-3. A first import batch model to support idempotent CSV ingestion.
+1. Database connectivity and migrations.
+2. `import_batch`, `import_row`, and `transaction` schema.
+3. CSV import orchestration with idempotency rules.

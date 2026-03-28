@@ -8,9 +8,16 @@ The project aims to provide a simple, secure, and private solution for tracking 
 
 ## Project Status
 
-In the early initialization phase. Features and tech stack are currently being defined.
+In the early initialization phase.
 
-The repository currently contains the project foundation: architecture notes, security policy, local infrastructure bootstrap, and the first domain decisions. The backend and frontend are not scaffolded yet on purpose; the next work should start from a narrow first slice rather than broad boilerplate.
+The repository now contains:
+
+- project-level guidance and architecture notes
+- local PostgreSQL bootstrap
+- a minimal Rust/Axum backend scaffold with health endpoints
+- the first financial domain invariants
+
+The backend exists to give the project an executable spine, not to pretend the domain is complete. The next slices should extend it through migrations and import logic rather than broad boilerplate.
 
 ## Initial Features (MVP)
 
@@ -38,16 +45,19 @@ The first phase of the project focuses on core financial tracking through file-b
 
 ## Repository Layout
 
-- `backend/`: Planned Rust/Axum application boundary.
+- `backend/`: Rust/Axum application.
 - `frontend/`: Planned React/Vite application boundary.
 - `docs/adr/`: Architecture Decision Records.
 - `docker-compose.yml`: Local PostgreSQL bootstrap.
+- `Cargo.toml`: Workspace root for Rust tooling.
 
 ## Local Bootstrap
 
 1. Copy `.env.example` to `.env`.
 2. Replace `POSTGRES_PASSWORD` with a long random password.
-3. Validate the local setup with `make check`.
-4. Start PostgreSQL with `make up-db`.
+3. Install a Rust toolchain with `rustup` if it is not already available.
+4. Validate the project with `make check`.
+5. Start PostgreSQL with `make up-db`.
+6. Run the backend with `make run-backend`.
 
 The compose file now requires explicit environment variables to avoid accidental insecure defaults.
