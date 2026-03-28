@@ -6,6 +6,7 @@ Current scope:
 
 - service bootstrap
 - configuration loading
+- PostgreSQL connection and embedded migrations
 - health and readiness endpoints
 - tracing baseline
 

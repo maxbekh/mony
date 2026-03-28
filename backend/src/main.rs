@@ -1,6 +1,11 @@
 use std::error::Error;
 
-use mony_backend::{app::build_router, config::AppConfig};
+use mony_backend::{
+    app::build_router,
+    config::AppConfig,
+    db::connect_and_migrate,
+    state::AppState,
+};
 use tokio::{net::TcpListener, signal};
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -11,11 +16,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let config = AppConfig::from_env()?;
     let address = config.address();
+    let pool = connect_and_migrate(&config.database).await?;
     let listener = TcpListener::bind(&address).await?;
+    let state = AppState { db: pool };
 
     info!(%address, "starting backend");
 
-    axum::serve(listener, build_router())
+    axum::serve(listener, build_router(state))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 
