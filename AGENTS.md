@@ -15,6 +15,7 @@ Minimum required workflow:
 ## Development Workflow
 
 - **Branch First**: Before making changes, create or switch to a descriptive feature branch. Do not work directly on `main`.
+- **Team-Style Branch Naming**: Branch names must describe the work, not the tool or agent. Use names such as `feat/csv-import`, `fix/healthcheck`, or `chore/project-foundation`. Do not use prefixes like `codex/`, `gemini/`, or other assistant names.
 - **Iterative Development**: Work on one feature or sub-feature at a time. Do not try to implement the entire application in one go.
 - **Small Commits**: Each change should be minimal and focused. Avoid massive diffs.
 - **Commit Conventions**: Use [Conventional Commits](https://www.conventionalcommits.org/) (e.g., `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
