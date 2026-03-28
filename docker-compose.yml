@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: mony
+      POSTGRES_USER: ${POSTGRES_USER:-mony}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mony}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mony"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Placeholder for backend
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   env_file: .env
+
+  # Placeholder for frontend
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "80:80"
+
+volumes:
+  postgres_data:
