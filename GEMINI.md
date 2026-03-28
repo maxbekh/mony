@@ -10,6 +10,26 @@ This file contains foundational mandates for any AI agent collaborating on the *
 - **Proactive Testing**: Every feature must be accompanied by relevant tests. A feature is not complete until it's verified.
 - **Clean Code**: Adhere to SOLID principles and keep the codebase easy to reason about.
 
+## Core Engineering Principles
+
+- **YAGNI (You Ain't Gonna Need It)**: Do not implement features or abstractions based on future "what-ifs". Only code what is strictly required for the current task.
+- **KISS (Keep It Simple, Stupid)**: Favor readability and simplicity over clever or "magical" code.
+- **Modular Monolith**: Keep the project in a single repository but maintain clear boundaries between domains (e.g., `auth`, `accounts`, `transactions`).
+- **No "Vibe Coding"**: Every architectural choice must be justified. If a complex pattern is suggested, provide a brief rationale.
+
+## Financial Integrity & Precision
+
+- **Integer-Only Currency**: Never use floats for money. All amounts MUST be stored as integers (in the smallest unit, e.g., cents) or using a library specifically designed for arbitrary-precision decimals (like `rust_decimal`).
+- **Immutability**: Once a transaction is recorded, it should ideally be immutable. Use "adjustments" or "reversals" instead of deleting or modifying history.
+- **Atomic Operations**: Use database transactions for any operation involving multiple records to ensure data consistency.
+
+## Security Mandates (Hard Rules)
+
+- **Zero-Trust Input**: All data coming from the frontend or external APIs must be strictly validated on the backend.
+- **Least Privilege**: Services (like the database user) should only have the permissions they strictly need.
+- **Dependency Audit**: Before adding a new library, evaluate its maintenance status, size, and security track record. Use `cargo-audit` for Rust.
+- **Secure Defaults**: All APIs must require authentication by default unless explicitly marked as public.
+
 ## Technology-Specific Workflow
 
 - **Backend (Rust/Axum)**:
