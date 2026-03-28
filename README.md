@@ -10,6 +10,8 @@ The project aims to provide a simple, secure, and private solution for tracking 
 
 In the early initialization phase. Features and tech stack are currently being defined.
 
+The repository currently contains the project foundation: architecture notes, security policy, local infrastructure bootstrap, and the first domain decisions. The backend and frontend are not scaffolded yet on purpose; the next work should start from a narrow first slice rather than broad boilerplate.
+
 ## Initial Features (MVP)
 
 The first phase of the project focuses on core financial tracking through file-based ingestion:
@@ -33,3 +35,19 @@ The first phase of the project focuses on core financial tracking through file-b
 - **Security by Design**: Security is not an afterthought; it's integrated from the start.
 - **Iterative & Clean**: Clean, tested code developed in small, manageable increments.
 - **Privacy First**: No telemetry, no external tracking.
+
+## Repository Layout
+
+- `backend/`: Planned Rust/Axum application boundary.
+- `frontend/`: Planned React/Vite application boundary.
+- `docs/adr/`: Architecture Decision Records.
+- `docker-compose.yml`: Local PostgreSQL bootstrap.
+
+## Local Bootstrap
+
+1. Copy `.env.example` to `.env`.
+2. Replace `POSTGRES_PASSWORD` with a long random password.
+3. Validate the local setup with `make check`.
+4. Start PostgreSQL with `make up-db`.
+
+The compose file now requires explicit environment variables to avoid accidental insecure defaults.

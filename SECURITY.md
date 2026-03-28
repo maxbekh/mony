@@ -6,7 +6,18 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please report it via [insert preferred method, e.g., GitHub Issues or a private email address]. We aim to respond to reports quickly and will work to address any verified issues.
+If you discover a security vulnerability, do not open a public issue.
+
+Until the project has a dedicated security mailbox or a private advisory channel on its forge, report vulnerabilities privately to the repository maintainer using the direct collaboration channel already used for this repository (private message or private email shared out of band).
+
+When reporting an issue, include:
+
+- A clear description of the problem and impact.
+- Steps to reproduce, proof of concept, or a minimal sample.
+- The affected commit, branch, or file if known.
+- Any suggested mitigation if you already identified one.
+
+We aim to acknowledge reports within 72 hours and provide a remediation plan or status update after triage.
 
 ## Security Practices
 
@@ -15,3 +26,4 @@ If you discover a security vulnerability, please report it via [insert preferred
 - **Local Data Storage**: Financial data is meant to be stored locally or on a user-controlled server, never on third-party cloud services.
 - **Encryption**: Sensitive data should be encrypted at rest and in transit (e.g., using TLS/HTTPS for web-based access).
 - **No Telemetry**: The application does not collect usage data or metrics.
+- **Private Disclosure**: Security reports are handled privately until a fix is available and affected users can upgrade safely.
