@@ -42,6 +42,16 @@ Minimum required workflow:
 - **Dependency Audit**: Evaluate maintenance status, footprint, and security track record before adding dependencies.
 - **Secure Defaults**: APIs should require authentication by default unless a route is explicitly public.
 
+## Public Repository Data Rules
+
+- **Assume Public Exposure**: Treat every commit, branch, pull request, log, screenshot, fixture, and code comment as public.
+- **No Secrets**: Never commit API keys, access tokens, passwords, private certificates, OAuth credentials, `.env` files, or copied secrets from local machines.
+- **No Real Financial Data**: Never commit real bank exports, transaction histories, account numbers, IBANs, card numbers, billing addresses, tax identifiers, or any personal financial records.
+- **Synthetic or Irreversibly Anonymized Fixtures Only**: Test fixtures must be fully synthetic or anonymized so the original person, account, or institution cannot be recovered.
+- **Sanitize Examples and Docs**: Sample payloads, screenshots, logs, and CSV examples must use fake names, fake identifiers, and fake values.
+- **Stop If Unsure**: If there is any doubt about whether data is sensitive, do not commit it. Replace it with synthetic data first.
+- **Review Before Commit**: Before each commit, inspect the staged diff specifically for secrets, personal data, and financial information.
+
 ## Execution Checklist
 
 For every non-trivial change:

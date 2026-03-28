@@ -43,6 +43,17 @@ The first phase of the project focuses on core financial tracking through file-b
 - **Iterative & Clean**: Clean, tested code developed in small, manageable increments.
 - **Privacy First**: No telemetry, no external tracking.
 
+## Public Repository Safety
+
+This repository is public. Do not commit:
+
+- real bank exports or transaction histories
+- account numbers, IBANs, card numbers, or billing details
+- secrets such as `.env` files, tokens, passwords, certificates, or API keys
+- screenshots, logs, or fixtures containing real personal data
+
+Any example dataset or fixture added to the repository must be synthetic or irreversibly anonymized.
+
 ## Repository Layout
 
 - `backend/`: Rust/Axum application.
