@@ -8,7 +8,14 @@
 
 If you discover a security vulnerability, do not open a public issue.
 
-Until the project has a dedicated security mailbox or a private advisory channel on its forge, report vulnerabilities privately to the repository maintainer using the direct collaboration channel already used for this repository (private message or private email shared out of band).
+Report vulnerabilities through GitHub's private vulnerability reporting for this repository:
+
+- [Repository Security Page](https://github.com/maxbekh/mony/security)
+- [Open a Private Security Advisory](https://github.com/maxbekh/mony/security/advisories/new)
+
+Use the `Report a vulnerability` button from the repository Security tab when it is available.
+
+If private vulnerability reporting is temporarily unavailable, open a public issue that requests a private security contact channel but do not include vulnerability details in that issue.
 
 When reporting an issue, include:
 

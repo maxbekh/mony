@@ -54,6 +54,11 @@ This repository is public. Do not commit:
 
 Any example dataset or fixture added to the repository must be synthetic or irreversibly anonymized.
 
+## Collaboration Workflow
+
+- Branch naming and contribution rules are documented in [CONTRIBUTING.md](./CONTRIBUTING.md).
+- AI-specific execution rules are documented in [AGENTS.md](./AGENTS.md).
+
 ## Repository Layout
 
 - `backend/`: Rust/Axum application.

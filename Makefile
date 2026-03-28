@@ -6,6 +6,7 @@ check: foundation-check backend-check
 
 foundation-check: compose-config
 	test -f README.md
+	test -f CONTRIBUTING.md
 	test -f SECURITY.md
 	test -f docs/adr/0001-initial-tech-stack.md
 	test -f docs/adr/0002-unified-financial-schema.md
