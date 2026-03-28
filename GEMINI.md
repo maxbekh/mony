@@ -30,6 +30,14 @@ This file contains foundational mandates for any AI agent collaborating on the *
 - **Dependency Audit**: Before adding a new library, evaluate its maintenance status, size, and security track record. Use `cargo-audit` for Rust.
 - **Secure Defaults**: All APIs must require authentication by default unless explicitly marked as public.
 
+## Collaborative Workflow & State Awareness
+
+- **State Discovery**: At the start of every session or task, run `git status`, `git branch`, and `git log -n 5` to understand the current state and recent changes. Never assume the environment is exactly as you left it.
+- **Feature Branching**: Work on descriptive feature branches (e.g., `feat/csv-parser`, `fix/auth-leak`). Only merge to `main` after verification.
+- **Atomic Commits**: Ensure each commit represents a single logical change. This makes code reviews and debugging significantly easier for others.
+- **Respect Others' Work**: Do not overwrite or refactor unrelated code without a clear reason and documentation (ADR or commit message).
+- **Communication via Git**: Use descriptive commit messages and, if working on a shared branch, provide a brief summary of progress in the session history.
+
 ## Technology-Specific Workflow
 
 - **Backend (Rust/Axum)**:
