@@ -2,11 +2,15 @@
 
 This file contains foundational mandates for any AI agent collaborating on the **mony** project.
 
+This policy applies to all AI coding assistants used in the repository, regardless of vendor or model. If another tool expects a different instruction filename, this document must be mirrored there without changing the intent.
+
 ## Development Workflow
 
+- **Branch First**: Before making changes, create or switch to a descriptive feature branch. Do not work directly on `main`.
 - **Iterative Development**: Work on one feature or sub-feature at a time. Do not try to implement the entire application in one go.
 - **Small Commits**: Each change should be minimal and focused. Avoid massive diffs.
 - **Commit Conventions**: Use [Conventional Commits](https://www.conventionalcommits.org/) (e.g., `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
+- **Commit Before Handover**: Do not leave completed work uncommitted. Before handing back a finished change, create the relevant atomic commit(s).
 - **Proactive Testing**: Every feature must be accompanied by relevant tests. A feature is not complete until it's verified.
 - **Clean Code**: Adhere to SOLID principles and keep the codebase easy to reason about.
 
@@ -34,9 +38,19 @@ This file contains foundational mandates for any AI agent collaborating on the *
 
 - **State Discovery**: At the start of every session or task, run `git status`, `git branch`, and `git log -n 5` to understand the current state and recent changes. Never assume the environment is exactly as you left it.
 - **Feature Branching**: Work on descriptive feature branches (e.g., `feat/csv-parser`, `fix/auth-leak`). Only merge to `main` after verification.
-- **Atomic Commits**: Ensure each commit represents a single logical change. This makes code reviews and debugging significantly easier for others.
+- **Atomic Commits**: Ensure each commit represents a single logical change. If a task includes multiple unrelated concerns, split them into separate commits before handover.
 - **Respect Others' Work**: Do not overwrite or refactor unrelated code without a clear reason and documentation (ADR or commit message).
 - **Communication via Git**: Use descriptive commit messages and, if working on a shared branch, provide a brief summary of progress in the session history.
+
+## Execution Checklist
+
+For every non-trivial change, the minimum expected Git workflow is:
+
+1. Run `git status`, `git branch`, and `git log -n 5`.
+2. Create or switch to a non-`main` branch.
+3. Make one logical change at a time.
+4. Verify the change with the relevant checks available in the environment.
+5. Create one Conventional Commit per logical change before handover.
 
 ## Technology-Specific Workflow
 
