@@ -1,8 +1,8 @@
 ENV_FILE ?= .env
 
-.PHONY: check foundation-check compose-config backend-check up-db down run-backend
+.PHONY: check foundation-check compose-config backend-check frontend-check frontend-build frontend-lint up-db down run-backend
 
-check: foundation-check backend-check
+check: foundation-check backend-check frontend-check
 
 foundation-check: compose-config
 	test -f README.md
@@ -20,6 +20,16 @@ backend-check:
 	cargo fmt --all --check
 	cargo clippy --workspace --all-targets --all-features -- -D warnings
 	cargo test --workspace
+
+frontend-check:
+	npm run lint --prefix frontend
+	npm run build --prefix frontend
+
+frontend-lint:
+	npm run lint --prefix frontend
+
+frontend-build:
+	npm run build --prefix frontend
 
 up-db:
 	docker compose --env-file $(ENV_FILE) up -d db

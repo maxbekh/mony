@@ -9,11 +9,14 @@ use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
 use crate::{
+    analytics::{get_spending_by_category, AnalyticsResponse},
+    categories::{list_categories, Category},
     ingestion::ingest_csv,
     state::AppState,
     transactions::{
-        get_transaction, list_transactions, update_transaction, TransactionListItem,
-        TransactionListParams, TransactionListResponse, TransactionUpdateParams,
+        get_transaction, list_transactions, update_transaction, TransactionListError,
+        TransactionListItem, TransactionListParams, TransactionListResponse,
+        TransactionUpdateError, TransactionUpdateParams,
     },
 };
 
@@ -40,8 +43,27 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/transactions", get(get_transactions))
         .route("/v1/transactions/{id}", get(get_transaction_by_id))
         .route("/v1/transactions/{id}", patch(patch_transaction))
+        .route(
+            "/v1/analytics/spending-by-category",
+            get(get_analytics_spending),
+        )
+        .route("/v1/categories", get(get_categories))
         .with_state(state)
         .layer(TraceLayer::new_for_http())
+}
+
+async fn get_analytics_spending(
+    State(state): State<AppState>,
+) -> Result<Json<AnalyticsResponse>, (StatusCode, String)> {
+    let response = get_spending_by_category(&state.db)
+        .await
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+
+    Ok(Json(response))
+}
+
+async fn get_categories() -> Json<Vec<Category>> {
+    Json(list_categories())
 }
 
 async fn import_csv(
@@ -97,7 +119,8 @@ async fn import_csv(
     }
 
     let file_name = file_name.ok_or((StatusCode::BAD_REQUEST, "Missing file part".to_string()))?;
-    let file_data = file_data.ok_or((StatusCode::BAD_REQUEST, "Missing file payload".to_string()))?;
+    let file_data =
+        file_data.ok_or((StatusCode::BAD_REQUEST, "Missing file payload".to_string()))?;
     let source_name = source_name
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
@@ -105,7 +128,10 @@ async fn import_csv(
     let source_account_ref = source_account_ref
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
-        .ok_or((StatusCode::BAD_REQUEST, "Missing source_account_ref".to_string()))?;
+        .ok_or((
+            StatusCode::BAD_REQUEST,
+            "Missing source_account_ref".to_string(),
+        ))?;
 
     let summary = ingest_csv(
         &state.db,
@@ -131,15 +157,11 @@ async fn import_csv(
 
 fn map_ingestion_error(error: crate::ingestion::IngestionError) -> (StatusCode, String) {
     match error {
-        crate::ingestion::IngestionError::DuplicateFile(message) => {
-            (StatusCode::CONFLICT, message)
-        }
+        crate::ingestion::IngestionError::DuplicateFile(message) => (StatusCode::CONFLICT, message),
         crate::ingestion::IngestionError::MissingField(_)
         | crate::ingestion::IngestionError::InvalidDate(_)
         | crate::ingestion::IngestionError::InvalidAmount(_)
-        | crate::ingestion::IngestionError::Csv(_) => {
-            (StatusCode::BAD_REQUEST, error.to_string())
-        }
+        | crate::ingestion::IngestionError::Csv(_) => (StatusCode::BAD_REQUEST, error.to_string()),
         crate::ingestion::IngestionError::Database(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
         }
@@ -152,9 +174,18 @@ async fn get_transactions(
 ) -> Result<Json<TransactionListResponse>, (StatusCode, String)> {
     let response = list_transactions(&state.db, params)
         .await
-        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+        .map_err(map_transaction_list_error)?;
 
     Ok(Json(response))
+}
+
+fn map_transaction_list_error(error: TransactionListError) -> (StatusCode, String) {
+    match error {
+        TransactionListError::Validation(message) => (StatusCode::BAD_REQUEST, message),
+        TransactionListError::Database(error) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+        }
+    }
 }
 
 async fn get_transaction_by_id(
@@ -176,10 +207,19 @@ async fn patch_transaction(
 ) -> Result<Json<TransactionListItem>, (StatusCode, String)> {
     let transaction = update_transaction(&state.db, id, params)
         .await
-        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
+        .map_err(map_transaction_update_error)?
         .ok_or((StatusCode::NOT_FOUND, "Transaction not found".to_string()))?;
 
     Ok(Json(transaction))
+}
+
+fn map_transaction_update_error(error: TransactionUpdateError) -> (StatusCode, String) {
+    match error {
+        TransactionUpdateError::Validation(message) => (StatusCode::BAD_REQUEST, message),
+        TransactionUpdateError::Database(error) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+        }
+    }
 }
 
 async fn health() -> (StatusCode, Json<StatusPayload>) {
@@ -293,7 +333,7 @@ mod tests {
         let response = build_router(test_state("postgres://mony:mony@127.0.0.1:5432/mony"))
             .oneshot(
                 Request::builder()
-                    .uri(&format!("/v1/transactions/{}", uuid::Uuid::new_v4()))
+                    .uri(format!("/v1/transactions/{}", uuid::Uuid::new_v4()))
                     .body(Body::empty())
                     .expect("request should build"),
             )
@@ -304,7 +344,8 @@ mod tests {
         // instead of 404 (Not Found) because the connection fails.
         // However, if it's connect_lazy, it might only fail when it tries to execute the query.
         assert!(
-            response.status() == StatusCode::NOT_FOUND || response.status() == StatusCode::INTERNAL_SERVER_ERROR
+            response.status() == StatusCode::NOT_FOUND
+                || response.status() == StatusCode::INTERNAL_SERVER_ERROR
         );
     }
 }

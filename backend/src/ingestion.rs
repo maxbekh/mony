@@ -36,6 +36,7 @@ pub struct NormalizedTransaction {
     pub currency: String,
     pub description: String,
     pub external_reference: Option<String>,
+    pub category_key: Option<String>,
     pub dedup_fingerprint: String,
 }
 
@@ -58,7 +59,8 @@ pub fn parse_csv(content: &[u8]) -> Result<Vec<RawRow>, IngestionError> {
 
     for (index, result) in rdr.deserialize::<BTreeMap<String, String>>().enumerate() {
         let record = result?;
-        let raw_record_json = serde_json::to_value(&record).expect("csv row should serialize to json");
+        let raw_record_json =
+            serde_json::to_value(&record).expect("csv row should serialize to json");
         let raw_hash = hex::encode(Sha256::digest(raw_record_json.to_string().as_bytes()));
 
         rows.push(RawRow {
@@ -102,7 +104,11 @@ fn parse_minor_units(raw: &str) -> Result<i64, IngestionError> {
         return Err(IngestionError::InvalidAmount(raw.to_owned()));
     }
 
-    let sign = if compact.starts_with('-') { -1_i64 } else { 1_i64 };
+    let sign = if compact.starts_with('-') {
+        -1_i64
+    } else {
+        1_i64
+    };
     let unsigned = compact.trim_start_matches(['+', '-']);
 
     let decimal_separator = match (unsigned.rfind('.'), unsigned.rfind(',')) {
@@ -121,10 +127,7 @@ fn parse_minor_units(raw: &str) -> Result<i64, IngestionError> {
         return Err(IngestionError::InvalidAmount(raw.to_owned()));
     }
 
-    let normalized_whole: String = whole_part
-        .chars()
-        .filter(|c| c.is_ascii_digit())
-        .collect();
+    let normalized_whole: String = whole_part.chars().filter(|c| c.is_ascii_digit()).collect();
     let normalized_fraction: String = fraction_part
         .chars()
         .filter(|c| c.is_ascii_digit())
@@ -192,6 +195,9 @@ fn normalize_row(
     let transaction_date = NaiveDate::parse_from_str(date, "%Y-%m-%d")
         .map_err(|_| IngestionError::InvalidDate(date.to_owned()))?;
     let amount_minor = parse_minor_units(amount)?;
+
+    let category_key = crate::categories::auto_categorize(&description);
+
     let dedup_fingerprint = compute_dedup_fingerprint(
         source_name,
         source_account_ref,
@@ -207,6 +213,7 @@ fn normalize_row(
         currency,
         description,
         external_reference,
+        category_key,
         dedup_fingerprint,
     })
 }
@@ -300,9 +307,10 @@ pub async fn ingest_csv(
                 amount_minor,
                 currency,
                 description,
+                category_key,
                 metadata
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             ON CONFLICT DO NOTHING
             "#,
         )
@@ -317,6 +325,7 @@ pub async fn ingest_csv(
         .bind(normalized.amount_minor)
         .bind(normalized.currency)
         .bind(normalized.description)
+        .bind(normalized.category_key)
         .bind(serde_json::json!({}))
         .execute(&mut *tx)
         .await?
@@ -329,14 +338,12 @@ pub async fn ingest_csv(
         }
     }
 
-    sqlx::query(
-        "UPDATE import_batch SET status = $1, row_count = $2 WHERE id = $3",
-    )
-    .bind("completed")
-    .bind(rows.len() as i32)
-    .bind(batch_id)
-    .execute(&mut *tx)
-    .await?;
+    sqlx::query("UPDATE import_batch SET status = $1, row_count = $2 WHERE id = $3")
+        .bind("completed")
+        .bind(rows.len() as i32)
+        .bind(batch_id)
+        .execute(&mut *tx)
+        .await?;
 
     tx.commit().await?;
 
@@ -373,12 +380,12 @@ mod tests {
     }
 
     #[test]
-    fn normalize_row_requires_generic_columns() {
+    fn normalize_row_requires_generic_columns_and_categorizes() {
         let record = serde_json::json!({
             "date": "2026-03-01",
             "amount": "100.00",
             "currency": "EUR",
-            "description": "Salary",
+            "description": "CARREFOUR SUPERMARKET",
             "external_reference": "abc-123"
         });
 
@@ -387,5 +394,6 @@ mod tests {
         assert_eq!(normalized.amount_minor, 10_000);
         assert_eq!(normalized.currency, "EUR");
         assert_eq!(normalized.external_reference.as_deref(), Some("abc-123"));
+        assert_eq!(normalized.category_key.as_deref(), Some("food.grocery"));
     }
 }

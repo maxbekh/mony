@@ -1,15 +1,19 @@
 # Frontend
 
-Reserved for the React/Vite application.
+React/Vite/TypeScript application for the `mony` UI.
 
-Initial responsibility:
+Current scope:
 
-- Import workflow for CSV files
-- Transaction review and categorization
-- Basic spending analytics
+- application shell with sidebar layout
+- client-side routing for dashboard, transactions, import, and analytics views
+- typed API client for backend contracts
+- baseline responsive styling
 
-The first frontend slice should include:
+Available commands:
 
-1. Application shell and routing.
-2. Typed API client for backend contracts.
-3. A narrow transaction list and import status screen before richer dashboards.
+- `npm run dev`
+- `npm run build`
+- `npm run lint`
+- `npm run preview`
+
+The current pages are scaffolds intended to be wired to the backend incrementally.

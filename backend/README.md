@@ -46,7 +46,16 @@ Supported query parameters:
 - `category_key`
 - `date_from`
 - `date_to`
+- `amount_min`
+- `amount_max`
+- `currency`
 - `search`
+
+Validation notes:
+
+- `date_from` must be earlier than or equal to `date_to`
+- `amount_min` must be less than or equal to `amount_max`
+- `currency` must be a 3-letter ISO 4217 code
 
 Immediate next slices:
 

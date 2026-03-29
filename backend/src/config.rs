@@ -52,9 +52,8 @@ impl AppConfig {
                     .map_err(|source| ConfigError::InvalidPostgresPort { value, source })?,
                 None => DEFAULT_POSTGRES_PORT,
             },
-            database: lookup("POSTGRES_DB").ok_or(ConfigError::MissingEnv {
-                key: "POSTGRES_DB",
-            })?,
+            database: lookup("POSTGRES_DB")
+                .ok_or(ConfigError::MissingEnv { key: "POSTGRES_DB" })?,
             user: lookup("POSTGRES_USER").ok_or(ConfigError::MissingEnv {
                 key: "POSTGRES_USER",
             })?,
@@ -136,13 +135,12 @@ mod tests {
 
     #[test]
     fn postgres_settings_are_required() {
-        let error = AppConfig::from_lookup(|_| None).expect_err("database config should be required");
+        let error =
+            AppConfig::from_lookup(|_| None).expect_err("database config should be required");
 
         assert!(matches!(
             error,
-            ConfigError::MissingEnv {
-                key: "POSTGRES_DB"
-            }
+            ConfigError::MissingEnv { key: "POSTGRES_DB" }
         ));
     }
 }

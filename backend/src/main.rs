@@ -1,10 +1,7 @@
 use std::error::Error;
 
 use mony_backend::{
-    app::build_router,
-    config::AppConfig,
-    db::connect_and_migrate,
-    state::AppState,
+    app::build_router, config::AppConfig, db::connect_and_migrate, state::AppState,
 };
 use tokio::{net::TcpListener, signal};
 use tracing::info;

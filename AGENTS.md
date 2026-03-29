@@ -12,16 +12,37 @@ Minimum required workflow:
 4. Use Conventional Commits.
 5. Commit completed logical changes before handover.
 
-## Development Workflow
+## Current Project State (as of 2026-03-29)
 
-- **Branch First**: Before making changes, create or switch to a descriptive feature branch. Do not work directly on `main`.
-- **Team-Style Branch Naming**: Branch names must describe the work, not the tool or agent. Use names such as `feat/csv-import`, `fix/healthcheck`, or `chore/project-foundation`. Do not use prefixes like `codex/`, `gemini/`, or other assistant names.
-- **Iterative Development**: Work on one feature or sub-feature at a time. Do not try to implement the entire application in one go.
-- **Small Commits**: Each change should be minimal and focused. Avoid massive diffs.
-- **Commit Conventions**: Use [Conventional Commits](https://www.conventionalcommits.org/) (e.g., `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
-- **Commit Before Handover**: Do not leave completed work uncommitted. Before handing back a finished change, create the relevant atomic commit(s).
-- **Proactive Testing**: Every feature must be accompanied by relevant tests. A feature is not complete until it's verified.
-- **Clean Code**: Keep the codebase easy to reason about. Favor explicitness over cleverness.
+- **Backend (Rust/Axum)**: Core ingestion (CSV), transaction listing/detail/update, analytics, and static category endpoints are operational.
+- **Database (PostgreSQL)**: Initial schema for imports and transactions is migrated.
+- **Frontend**: React/Vite/TypeScript scaffold is present with routing, layout, and typed API client foundations.
+- **Infrastructure**: Docker and Makefile exist with backend and frontend validation commands.
+
+## Roadmap & Next Steps
+
+Agents should pick tasks from this list and **update `TODO.md`** to indicate they are working on it (e.g., by adding `(IN PROGRESS - @agent_name)`).
+
+### Phase 1: Frontend Foundation (CRITICAL)
+- **Task 1.1**: Initialize React/Vite/TypeScript in `/frontend`. Use standard styling (Vanilla CSS or simple UI library).
+- **Task 1.2**: Setup routing (React Router) and base layout (Sidebar, Content area).
+- **Task 1.3**: Implement a basic API client (fetch or axios) with proper types matching backend models.
+
+### Phase 2: Backend Categories & Analytics
+- **Task 2.1**: Implement `GET /v1/analytics/spending-by-category` (Aggregate `amount_minor` by `category_key`).
+- **Task 2.2**: Decide on category management (static vs dynamic) and implement necessary endpoints.
+- **Task 2.3**: Basic auto-categorization (regex-based rules on descriptions).
+
+### Phase 3: Transaction Refinement
+- **Task 3.1**: Improve `PATCH /v1/transactions/:id` to allow partial updates of metadata.
+- **Task 3.2**: Add pagination and advanced filtering (by date range, amount, category) to `GET /v1/transactions`.
+
+## Task Coordination Protocol
+
+1. **CLAIM**: Before starting, check `TODO.md`. If a task is not claimed, add your name next to it: `- [ ] (CLAIMED: @agent_name) Task description`.
+2. **BRANCH**: Create a branch specific to the task: `feat/frontend-scaffold`.
+3. **UPDATE**: Periodically update `TODO.md` with progress if the task is long.
+4. **COMPLETE**: Once done, check the box `- [x] Task description` and remove your claim tag.
 
 ## Core Engineering Principles
 
@@ -32,7 +53,7 @@ Minimum required workflow:
 
 ## Financial Integrity and Precision
 
-- **Integer-Only Currency**: Never use floats for money. All amounts must be stored as integers in the smallest unit or via a decimal library chosen deliberately for financial precision.
+- **Integer-Only Currency**: Never use floats for money. All amounts must be stored as integers in the smallest unit (minor units like cents) or via a decimal library chosen deliberately for financial precision.
 - **Immutability**: Once a transaction is recorded, prefer adjustments or reversals instead of rewriting history.
 - **Atomic Operations**: Use database transactions for any operation involving multiple records to preserve consistency.
 
@@ -52,13 +73,3 @@ Minimum required workflow:
 - **Sanitize Examples and Docs**: Sample payloads, screenshots, logs, and CSV examples must use fake names, fake identifiers, and fake values.
 - **Stop If Unsure**: If there is any doubt about whether data is sensitive, do not commit it. Replace it with synthetic data first.
 - **Review Before Commit**: Before each commit, inspect the staged diff specifically for secrets, personal data, and financial information.
-
-## Execution Checklist
-
-For every non-trivial change:
-
-1. Run `git status`, `git branch`, and `git log -n 5`.
-2. Create or switch to a non-`main` branch.
-3. Make one logical change at a time.
-4. Verify the change with the checks available in the environment.
-5. Create one Conventional Commit per logical change before handover.
