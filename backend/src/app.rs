@@ -19,6 +19,9 @@ struct StatusPayload {
 #[derive(Debug, Serialize)]
 struct ImportResponse {
     batch_id: String,
+    row_count: usize,
+    inserted_transactions: usize,
+    skipped_duplicates: usize,
     message: String,
 }
 
@@ -35,7 +38,10 @@ async fn import_csv(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<ImportResponse>), (StatusCode, String)> {
-    let mut batch_id = None;
+    let mut file_name = None;
+    let mut file_data = None;
+    let mut source_name = None;
+    let mut source_account_ref = None;
 
     while let Some(field) = multipart
         .next_field()
@@ -43,36 +49,90 @@ async fn import_csv(
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
     {
         let name = field.name().unwrap_or_default().to_string();
-        let file_name = field.file_name().unwrap_or_default().to_string();
-        let data = field
-            .bytes()
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-        if name == "file" {
-            let id = ingest_csv(
-                &state.db,
-                "generic-csv",        // Hardcoded for now
-                "default-account",    // Hardcoded for now
-                &file_name,
-                &data,
-            )
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-            batch_id = Some(id);
+        match name.as_str() {
+            "file" => {
+                let uploaded_name = field.file_name().unwrap_or("upload.csv").to_string();
+                let data = field
+                    .bytes()
+                    .await
+                    .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+                file_name = Some(uploaded_name);
+                file_data = Some(data);
+            }
+            "source_name" => {
+                source_name = Some(
+                    field
+                        .text()
+                        .await
+                        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?,
+                );
+            }
+            "source_account_ref" => {
+                source_account_ref = Some(
+                    field
+                        .text()
+                        .await
+                        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?,
+                );
+            }
+            _ => {
+                let _ = field
+                    .bytes()
+                    .await
+                    .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+            }
         }
     }
 
-    if let Some(id) = batch_id {
-        Ok((
-            StatusCode::ACCEPTED,
-            Json(ImportResponse {
-                batch_id: id.to_string(),
-                message: "Import started".to_string(),
-            }),
-        ))
-    } else {
-        Err((StatusCode::BAD_REQUEST, "No file uploaded".to_string()))
+    let file_name = file_name.ok_or((StatusCode::BAD_REQUEST, "Missing file part".to_string()))?;
+    let file_data = file_data.ok_or((StatusCode::BAD_REQUEST, "Missing file payload".to_string()))?;
+    let source_name = source_name
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .ok_or((StatusCode::BAD_REQUEST, "Missing source_name".to_string()))?;
+    let source_account_ref = source_account_ref
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .ok_or((StatusCode::BAD_REQUEST, "Missing source_account_ref".to_string()))?;
+
+    let summary = ingest_csv(
+        &state.db,
+        &source_name,
+        &source_account_ref,
+        &file_name,
+        &file_data,
+    )
+    .await
+    .map_err(map_ingestion_error)?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(ImportResponse {
+            batch_id: summary.batch_id.to_string(),
+            row_count: summary.row_count,
+            inserted_transactions: summary.inserted_transactions,
+            skipped_duplicates: summary.skipped_duplicates,
+            message: "Import completed".to_string(),
+        }),
+    ))
+}
+
+fn map_ingestion_error(error: crate::ingestion::IngestionError) -> (StatusCode, String) {
+    match error {
+        crate::ingestion::IngestionError::DuplicateFile(message) => {
+            (StatusCode::CONFLICT, message)
+        }
+        crate::ingestion::IngestionError::MissingField(_)
+        | crate::ingestion::IngestionError::InvalidDate(_)
+        | crate::ingestion::IngestionError::InvalidAmount(_)
+        | crate::ingestion::IngestionError::Csv(_) => {
+            (StatusCode::BAD_REQUEST, error.to_string())
+        }
+        crate::ingestion::IngestionError::Database(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+        }
     }
 }
 

@@ -9,9 +9,31 @@ Current scope:
 - PostgreSQL connection and embedded migrations
 - health and readiness endpoints
 - tracing baseline
+- generic CSV import endpoint with normalization and idempotent persistence
+
+## Generic CSV Import Contract
+
+Current endpoint: `POST /v1/imports`
+
+Multipart form fields:
+
+- `file`: the CSV file
+- `source_name`: logical source identifier, for example `bnp-csv`
+- `source_account_ref`: stable account identifier inside that source
+
+Required CSV columns:
+
+- `date` in `YYYY-MM-DD`
+- `amount` as a decimal string
+- `currency` as ISO 4217 code
+- `description`
+
+Optional CSV columns:
+
+- `external_reference`
 
 Immediate next slices:
 
-1. Database connectivity and migrations.
-2. `import_batch`, `import_row`, and `transaction` schema.
-3. CSV import orchestration with idempotency rules.
+1. Transaction listing and filtering API.
+2. Category assignment and transaction enrichment.
+3. Parser specializations per bank export format.

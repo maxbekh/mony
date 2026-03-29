@@ -14,7 +14,7 @@ The repository now contains:
 
 - project-level guidance and architecture notes
 - local PostgreSQL bootstrap
-- a minimal Rust/Axum backend scaffold with health endpoints
+- a Rust/Axum backend with health, readiness, and generic CSV import
 - the first financial domain invariants
 
 The backend exists to give the project an executable spine, not to pretend the domain is complete. The next slices should extend it through migrations and import logic rather than broad boilerplate.
