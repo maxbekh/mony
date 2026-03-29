@@ -14,9 +14,9 @@ This file tracks the progress of the **mony** project.
 
 ### Ingestion & Normalization
 - [ ] Define internal transaction normalization logic (ADR 0003)
-- [ ] CSV Parsing library integration (e.g., `csv` crate)
-- [ ] Endpoint: `POST /v1/imports` (File upload)
-- [ ] Logic: Deduplication and idempotent imports
+- [x] CSV Parsing library integration (e.g., `csv` crate)
+- [x] Endpoint: `POST /v1/imports` (File upload)
+- [/] Logic: Deduplication and idempotent imports (Duplicate file check implemented)
 - [ ] Logic: Background processing for large imports (optional for MVP)
 
 ### Transaction Management

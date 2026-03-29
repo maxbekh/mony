@@ -1,9 +1,14 @@
-use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
+use axum::{
+    extract::{Multipart, State},
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::Serialize;
 use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
-use crate::state::AppState;
+use crate::{ingestion::ingest_csv, state::AppState};
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 struct StatusPayload {
@@ -11,12 +16,64 @@ struct StatusPayload {
     status: &'static str,
 }
 
+#[derive(Debug, Serialize)]
+struct ImportResponse {
+    batch_id: String,
+    message: String,
+}
+
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
+        .route("/v1/imports", post(import_csv))
         .with_state(state)
         .layer(TraceLayer::new_for_http())
+}
+
+async fn import_csv(
+    State(state): State<AppState>,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<ImportResponse>), (StatusCode, String)> {
+    let mut batch_id = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+    {
+        let name = field.name().unwrap_or_default().to_string();
+        let file_name = field.file_name().unwrap_or_default().to_string();
+        let data = field
+            .bytes()
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        if name == "file" {
+            let id = ingest_csv(
+                &state.db,
+                "generic-csv",        // Hardcoded for now
+                "default-account",    // Hardcoded for now
+                &file_name,
+                &data,
+            )
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            batch_id = Some(id);
+        }
+    }
+
+    if let Some(id) = batch_id {
+        Ok((
+            StatusCode::ACCEPTED,
+            Json(ImportResponse {
+                batch_id: id.to_string(),
+                message: "Import started".to_string(),
+            }),
+        ))
+    } else {
+        Err((StatusCode::BAD_REQUEST, "No file uploaded".to_string()))
+    }
 }
 
 async fn health() -> (StatusCode, Json<StatusPayload>) {
