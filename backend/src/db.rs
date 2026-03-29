@@ -5,8 +5,6 @@ use sqlx::{
 
 use crate::config::DatabaseConfig;
 
-pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
-
 pub async fn connect_and_migrate(config: &DatabaseConfig) -> Result<PgPool, sqlx::Error> {
     let options = PgConnectOptions::new()
         .host(&config.host)
@@ -20,7 +18,7 @@ pub async fn connect_and_migrate(config: &DatabaseConfig) -> Result<PgPool, sqlx
         .connect_with(options)
         .await?;
 
-    MIGRATOR.run(&pool).await?;
+    sqlx::migrate!("./migrations").run(&pool).await?;
 
     Ok(pool)
 }
