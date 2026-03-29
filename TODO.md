@@ -21,8 +21,8 @@ This file tracks the progress of the **mony** project.
 
 ### Transaction Management
 - [x] Endpoint: `GET /v1/transactions` (List/Filter transactions)
-- [ ] Endpoint: `GET /v1/transactions/:id` (Transaction details)
-- [ ] Endpoint: `PATCH /v1/transactions/:id` (Update category/metadata)
+- [x] Endpoint: `GET /v1/transactions/:id` (Transaction details)
+- [x] Endpoint: `PATCH /v1/transactions/:id` (Update category/metadata)
 
 ### Categories & Analytics
 - [ ] Initial set of system categories

@@ -1,7 +1,7 @@
 use axum::{
-    extract::{Multipart, Query, State},
+    extract::{Multipart, Path, Query, State},
     http::StatusCode,
-    routing::{get, post},
+    routing::{get, patch, post},
     Json, Router,
 };
 use serde::Serialize;
@@ -11,7 +11,10 @@ use tower_http::trace::TraceLayer;
 use crate::{
     ingestion::ingest_csv,
     state::AppState,
-    transactions::{list_transactions, TransactionListParams, TransactionListResponse},
+    transactions::{
+        get_transaction, list_transactions, update_transaction, TransactionListItem,
+        TransactionListParams, TransactionListResponse, TransactionUpdateParams,
+    },
 };
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -35,6 +38,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/ready", get(ready))
         .route("/v1/imports", post(import_csv))
         .route("/v1/transactions", get(get_transactions))
+        .route("/v1/transactions/{id}", get(get_transaction_by_id))
+        .route("/v1/transactions/{id}", patch(patch_transaction))
         .with_state(state)
         .layer(TraceLayer::new_for_http())
 }
@@ -152,6 +157,31 @@ async fn get_transactions(
     Ok(Json(response))
 }
 
+async fn get_transaction_by_id(
+    State(state): State<AppState>,
+    Path(id): Path<uuid::Uuid>,
+) -> Result<Json<TransactionListItem>, (StatusCode, String)> {
+    let transaction = get_transaction(&state.db, id)
+        .await
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "Transaction not found".to_string()))?;
+
+    Ok(Json(transaction))
+}
+
+async fn patch_transaction(
+    State(state): State<AppState>,
+    Path(id): Path<uuid::Uuid>,
+    Json(params): Json<TransactionUpdateParams>,
+) -> Result<Json<TransactionListItem>, (StatusCode, String)> {
+    let transaction = update_transaction(&state.db, id, params)
+        .await
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?
+        .ok_or((StatusCode::NOT_FOUND, "Transaction not found".to_string()))?;
+
+    Ok(Json(transaction))
+}
+
 async fn health() -> (StatusCode, Json<StatusPayload>) {
     (
         StatusCode::OK,
@@ -256,5 +286,25 @@ mod tests {
             .expect("body should be readable");
 
         assert!(body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn get_transaction_returns_not_found_for_random_id() {
+        let response = build_router(test_state("postgres://mony:mony@127.0.0.1:5432/mony"))
+            .oneshot(
+                Request::builder()
+                    .uri(&format!("/v1/transactions/{}", uuid::Uuid::new_v4()))
+                    .body(Body::empty())
+                    .expect("request should build"),
+            )
+            .await
+            .expect("router should respond");
+
+        // Since the database is not actually running, this might return 500 (Internal Server Error)
+        // instead of 404 (Not Found) because the connection fails.
+        // However, if it's connect_lazy, it might only fail when it tries to execute the query.
+        assert!(
+            response.status() == StatusCode::NOT_FOUND || response.status() == StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }

@@ -27,6 +27,7 @@ pub struct TransactionListItem {
     pub currency: String,
     pub description: String,
     pub category_key: Option<String>,
+    pub metadata: serde_json::Value,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -36,6 +37,12 @@ pub struct TransactionListResponse {
     pub limit: u32,
     pub offset: u32,
     pub returned: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TransactionUpdateParams {
+    pub category_key: Option<String>,
+    pub metadata: Option<serde_json::Value>,
 }
 
 impl TransactionListParams {
@@ -90,6 +97,7 @@ pub async fn list_transactions(
             currency,
             description,
             category_key,
+            metadata,
             created_at
         FROM ledger_transaction
         "#,
@@ -148,6 +156,89 @@ pub async fn list_transactions(
         limit: params.limit,
         offset: params.offset,
     })
+}
+
+pub async fn get_transaction(
+    pool: &PgPool,
+    id: Uuid,
+) -> Result<Option<TransactionListItem>, sqlx::Error> {
+    sqlx::query_as::<_, TransactionListItem>(
+        r#"
+        SELECT
+            id,
+            import_batch_id,
+            source_name,
+            source_account_ref,
+            external_reference,
+            transaction_date,
+            amount_minor,
+            currency,
+            description,
+            category_key,
+            metadata,
+            created_at
+        FROM ledger_transaction
+        WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn update_transaction(
+    pool: &PgPool,
+    id: Uuid,
+    params: TransactionUpdateParams,
+) -> Result<Option<TransactionListItem>, sqlx::Error> {
+    let mut query = QueryBuilder::new("UPDATE ledger_transaction SET ");
+
+    let mut has_update = false;
+
+    if let Some(category_key) = params.category_key {
+        let normalized = normalize_optional(Some(category_key));
+        query.push("category_key = ");
+        query.push_bind(normalized);
+        has_update = true;
+    }
+
+    if let Some(metadata) = params.metadata {
+        if has_update {
+            query.push(", ");
+        }
+        query.push("metadata = ");
+        query.push_bind(metadata);
+        has_update = true;
+    }
+
+    if !has_update {
+        return get_transaction(pool, id).await;
+    }
+
+    query.push(" WHERE id = ");
+    query.push_bind(id);
+    query.push(
+        r#"
+        RETURNING
+            id,
+            import_batch_id,
+            source_name,
+            source_account_ref,
+            external_reference,
+            transaction_date,
+            amount_minor,
+            currency,
+            description,
+            category_key,
+            metadata,
+            created_at
+        "#,
+    );
+
+    query
+        .build_query_as::<TransactionListItem>()
+        .fetch_optional(pool)
+        .await
 }
 
 fn push_filter<'a>(
