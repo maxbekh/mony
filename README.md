@@ -28,6 +28,7 @@ The first phase of the project focuses on core financial tracking through file-b
 - **Categorization Engine**: Automatic and manual assignment of categories to transactions.
 - **Spending Analytics**: Clear visualization of expenses by category, time, and source.
 - **Privacy-Preserving Tracking**: All processing happens locally; no financial data ever leaves your server.
+- **Transaction Review**: Filter and inspect imported transactions before richer workflows are added.
 
 ## Tech Stack
 

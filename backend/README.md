@@ -10,6 +10,7 @@ Current scope:
 - health and readiness endpoints
 - tracing baseline
 - generic CSV import endpoint with normalization and idempotent persistence
+- transaction listing API with basic filtering and pagination
 
 ## Generic CSV Import Contract
 
@@ -32,8 +33,23 @@ Optional CSV columns:
 
 - `external_reference`
 
+## Transaction Listing Contract
+
+Current endpoint: `GET /v1/transactions`
+
+Supported query parameters:
+
+- `limit`
+- `offset`
+- `source_name`
+- `source_account_ref`
+- `category_key`
+- `date_from`
+- `date_to`
+- `search`
+
 Immediate next slices:
 
-1. Transaction listing and filtering API.
+1. Transaction detail API.
 2. Category assignment and transaction enrichment.
 3. Parser specializations per bank export format.

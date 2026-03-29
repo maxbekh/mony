@@ -20,7 +20,7 @@ This file tracks the progress of the **mony** project.
 - [ ] Logic: Background processing for large imports (optional for MVP)
 
 ### Transaction Management
-- [ ] Endpoint: `GET /v1/transactions` (List/Filter transactions)
+- [x] Endpoint: `GET /v1/transactions` (List/Filter transactions)
 - [ ] Endpoint: `GET /v1/transactions/:id` (Transaction details)
 - [ ] Endpoint: `PATCH /v1/transactions/:id` (Update category/metadata)
 

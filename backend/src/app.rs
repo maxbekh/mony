@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Multipart, State},
+    extract::{Multipart, Query, State},
     http::StatusCode,
     routing::{get, post},
     Json, Router,
@@ -8,7 +8,11 @@ use serde::Serialize;
 use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
-use crate::{ingestion::ingest_csv, state::AppState};
+use crate::{
+    ingestion::ingest_csv,
+    state::AppState,
+    transactions::{list_transactions, TransactionListParams, TransactionListResponse},
+};
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 struct StatusPayload {
@@ -30,6 +34,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(health))
         .route("/ready", get(ready))
         .route("/v1/imports", post(import_csv))
+        .route("/v1/transactions", get(get_transactions))
         .with_state(state)
         .layer(TraceLayer::new_for_http())
 }
@@ -134,6 +139,17 @@ fn map_ingestion_error(error: crate::ingestion::IngestionError) -> (StatusCode, 
             (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
         }
     }
+}
+
+async fn get_transactions(
+    State(state): State<AppState>,
+    Query(params): Query<TransactionListParams>,
+) -> Result<Json<TransactionListResponse>, (StatusCode, String)> {
+    let response = list_transactions(&state.db, params)
+        .await
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+
+    Ok(Json(response))
 }
 
 async fn health() -> (StatusCode, Json<StatusPayload>) {
