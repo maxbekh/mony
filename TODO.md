@@ -53,6 +53,8 @@ This file tracks the progress of the **mony** project.
 - [ ] Intelligent categorization: learn from confirmed historical categorizations already stored in the database
 - [ ] Intelligent categorization: add optional AI suggestions only for unresolved or low-confidence cases
 - [x] Implement auth foundation: bootstrap admin, JWT access tokens, refresh token rotation, session audit, and protected web/API flows
+- [x] Product/UI: add system-aware dark mode with explicit light/dark override support
+- [x] Product/UI: rename Account to Settings and consolidate appearance, password, session, and security activity flows
 
 ## Phase 4: Authentication & Authorization
 
@@ -63,6 +65,11 @@ This file tracks the progress of the **mony** project.
 - [x] **(Task 4.5)** Protect `/v1/*` routes by default and introduce scope-aware auth extractors/middleware
 - [x] **(Task 4.6)** Integrate the React web app with login, token refresh, route protection, and secure token storage rules
 - [x] **(Task 4.7)** Add backend and frontend validation coverage for auth flows and protected route behavior
+- [x] **(Task 4.8)** Add auth event visibility, login failure logging, and baseline auth rate limiting
+- [ ] **(Task 4.9)** Replace in-memory auth throttling with a more robust persistent or distributed strategy
+- [ ] **(Task 4.10)** Extend auth audit coverage and add filtering/pagination in Settings
+- [ ] **(Task 4.11)** Add MFA/TOTP support and recovery code flows
+- [ ] **(Task 4.12)** Prepare explicit OIDC identity mapping (`issuer` / `sub`) and provider integration boundaries
 
 ## Notes For Upcoming Work
 
@@ -75,10 +82,11 @@ This file tracks the progress of the **mony** project.
 
 ## Immediate Next Objectives
 
-- Harden auth beyond the foundation: rate limiting, MFA, and explicit OIDC provider integration planning.
-- Add finer-grained scope assignment and future user/workspace authorization boundaries.
+- Replace auth rate limiting with something durable enough for multi-process or restart-safe deployments.
+- Extend auth events with more failure cases and expose filtering or pagination in Settings.
+- Add frontend tests around theme preference, `/account` to `/settings` redirect, and protected auth UX.
+- Define the next auth/authz layer: MFA, role or scope boundaries, and OIDC external identity mapping.
 - Build a local-only categorization memory layer that learns from confirmed edits without storing personal patterns in the public repository.
-- Run a short real-device polish pass on the new mobile experience and tighten any remaining spacing, safe-area, and Safari icon quirks.
 
 ## Infrastructure & DX
 
