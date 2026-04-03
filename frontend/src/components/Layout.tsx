@@ -19,7 +19,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Categorize', path: '/categorize', icon: Tags },
     { name: 'Import', path: '/import', icon: Upload },
     { name: 'Analytics', path: '/analytics', icon: PieChart },
-    { name: 'Account', path: '/account', icon: KeyRound },
+    { name: 'Settings', path: '/settings', icon: KeyRound },
   ];
   const currentNavItem = navItems.find((item) => item.path === location.pathname) ?? navItems[0];
 

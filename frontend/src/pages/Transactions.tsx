@@ -653,7 +653,7 @@ const Transactions: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 1rem;
-          background: white;
+          background: var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
           padding: 1rem;
@@ -661,7 +661,7 @@ const Transactions: React.FC = () => {
         .search-form {
           display: flex;
           align-items: center;
-          background: white;
+          background: var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.5rem;
           padding-left: 0.75rem;
@@ -708,7 +708,13 @@ const Transactions: React.FC = () => {
           border-radius: 0.5rem;
           padding: 0.75rem;
           font-size: 0.875rem;
-          background: white;
+          background: var(--surface-color);
+          color: var(--text-main);
+        }
+        select.control-input,
+        select.form-input,
+        .inline-category-select {
+          padding-right: 2.4rem;
         }
         .checkbox-control {
           display: inline-flex;
@@ -719,7 +725,7 @@ const Transactions: React.FC = () => {
           font-size: 0.875rem;
         }
         .card {
-          background: white;
+          background: var(--surface-color);
           border-radius: 0.75rem;
           border: 1px solid var(--border-color);
           overflow: hidden;
@@ -738,7 +744,7 @@ const Transactions: React.FC = () => {
           font-weight: 600;
           text-transform: uppercase;
           color: var(--text-muted);
-          background: #f8fafc;
+          background: var(--surface-muted);
           border-bottom: 1px solid var(--border-color);
         }
         .table td {
@@ -778,10 +784,10 @@ const Transactions: React.FC = () => {
         }
         .category-trigger:hover {
           transform: translateY(-1px);
-          box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+          box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
         }
-        .badge.category { background: #dbeafe; color: #1e40af; }
-        .badge.uncategorized { background: #f1f5f9; color: #475569; }
+        .badge.category { background: var(--surface-accent-strong); color: var(--primary-color); }
+        .badge.uncategorized { background: var(--surface-hover); color: var(--text-muted); }
         .inline-category-editor {
           display: flex;
           flex-direction: column;
@@ -791,7 +797,7 @@ const Transactions: React.FC = () => {
           padding: 0.7rem 0.85rem 0.7rem 0.7rem;
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
-          background: #f8fafc;
+          background: var(--surface-muted);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
         }
         .inline-category-header {
@@ -821,8 +827,9 @@ const Transactions: React.FC = () => {
           min-height: 2.35rem;
           border: 1px solid var(--border-color);
           border-radius: 0.6rem;
-          padding: 0.55rem 0.7rem;
-          background: white;
+          padding: 0.55rem 2.4rem 0.55rem 0.7rem;
+          background: var(--surface-color);
+          color: var(--text-main);
           font: inherit;
         }
         .inline-category-actions {
@@ -853,7 +860,7 @@ const Transactions: React.FC = () => {
           gap: 0.25rem;
         }
         .inline-error {
-          color: #b91c1c;
+          color: var(--danger-text);
         }
         .mobile-transaction-list {
           display: none;
@@ -864,7 +871,7 @@ const Transactions: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 0.9rem;
-          background: white;
+          background: var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 1rem;
           padding: 1rem;
@@ -896,7 +903,7 @@ const Transactions: React.FC = () => {
           gap: 0.8rem;
           padding: 0.7rem 0.8rem;
           border-radius: 0.85rem;
-          background: #f8fafc;
+          background: var(--surface-muted);
           font-size: 0.82rem;
         }
         .mobile-category-block {
@@ -923,8 +930,8 @@ const Transactions: React.FC = () => {
         .text-sm { font-size: 0.875rem; }
         .text-xs { font-size: 0.75rem; }
         .text-muted { color: var(--text-muted); }
-        .amount-negative { color: #ef4444; }
-        .amount-positive { color: #10b981; }
+        .amount-negative { color: var(--negative-color); }
+        .amount-positive { color: var(--positive-color); }
         .button {
           display: inline-flex;
           align-items: center;
@@ -940,13 +947,13 @@ const Transactions: React.FC = () => {
         }
         .button.primary {
           background: var(--primary-color);
-          color: white;
+          color: var(--primary-contrast);
         }
         .button.primary:hover {
           background: var(--primary-hover);
         }
         .button.secondary {
-          background: white;
+          background: var(--surface-color);
           border-color: var(--border-color);
           color: var(--text-main);
         }
@@ -973,7 +980,7 @@ const Transactions: React.FC = () => {
           height: 2.25rem;
           border-radius: 0.5rem;
           border: 1px solid var(--border-color);
-          background: white;
+          background: var(--surface-color);
           cursor: pointer;
         }
         .pagination {
@@ -981,7 +988,7 @@ const Transactions: React.FC = () => {
           justify-content: space-between;
           align-items: center;
           padding: 1rem 1.5rem;
-          background: #f8fafc;
+          background: var(--surface-muted);
         }
         .pagination-controls {
           display: flex;
@@ -993,14 +1000,14 @@ const Transactions: React.FC = () => {
           border: 1px solid;
         }
         .notice.error {
-          background: #fef2f2;
-          border-color: #fca5a5;
-          color: #991b1b;
+          background: var(--danger-bg);
+          border-color: var(--danger-border);
+          color: var(--danger-text);
         }
         .modal-backdrop {
           position: fixed;
           inset: 0;
-          background: rgba(15, 23, 42, 0.45);
+          background: var(--overlay-color);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1009,7 +1016,7 @@ const Transactions: React.FC = () => {
         }
         .modal-card {
           width: min(100%, 36rem);
-          background: white;
+          background: var(--surface-color);
           border-radius: 1rem;
           border: 1px solid var(--border-color);
           box-shadow: 0 20px 50px rgba(15, 23, 42, 0.16);
@@ -1038,7 +1045,7 @@ const Transactions: React.FC = () => {
           gap: 0.75rem;
           padding: 1rem;
           border-radius: 0.75rem;
-          background: #f8fafc;
+          background: var(--surface-muted);
         }
         .summary-grid > div {
           display: flex;

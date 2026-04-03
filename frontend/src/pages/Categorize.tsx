@@ -211,13 +211,13 @@ const Categorize: React.FC = () => {
         .queue-meta {
           padding: 0.5rem 0.875rem;
           border-radius: 999px;
-          background: white;
+          background: var(--surface-color);
           border: 1px solid var(--border-color);
           font-size: 0.875rem;
           color: var(--text-muted);
         }
         .card {
-          background: white;
+          background: var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
           overflow: hidden;
@@ -232,7 +232,7 @@ const Categorize: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 1rem;
-          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+          background: linear-gradient(180deg, var(--surface-color) 0%, var(--surface-muted) 100%);
         }
         .queue-progress {
           display: flex;
@@ -303,13 +303,13 @@ const Categorize: React.FC = () => {
           padding: 1rem;
           border-radius: 0.75rem;
           border: 1px solid var(--border-color);
-          background: white;
+          background: var(--surface-color);
           cursor: pointer;
           text-align: left;
         }
         .category-button:hover {
           border-color: var(--primary-color);
-          background: #f8fbff;
+          background: var(--surface-accent);
         }
         .category-button:disabled {
           opacity: 0.6;
@@ -333,7 +333,7 @@ const Categorize: React.FC = () => {
           cursor: pointer;
         }
         .button.secondary {
-          background: white;
+          background: var(--surface-color);
           border-color: var(--border-color);
           color: var(--text-main);
         }
@@ -343,9 +343,9 @@ const Categorize: React.FC = () => {
           border: 1px solid;
         }
         .notice.error {
-          background: #fef2f2;
-          border-color: #fca5a5;
-          color: #991b1b;
+          background: var(--danger-bg);
+          border-color: var(--danger-border);
+          color: var(--danger-text);
         }
         .empty-state {
           min-height: 18rem;
@@ -397,12 +397,12 @@ const Categorize: React.FC = () => {
           .transaction-details > div {
             padding: 0.7rem;
             border-radius: 0.8rem;
-            background: white;
+            background: var(--surface-color);
             border: 1px solid var(--border-color);
           }
           .category-panel {
             padding: 1rem;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            background: linear-gradient(180deg, var(--surface-color) 0%, var(--surface-accent) 100%);
           }
           .panel-header {
             flex-direction: column;
