@@ -1,8 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { KeyRound, LayoutDashboard, Moon, PieChart, Receipt, Sun, Tags, Upload } from 'lucide-react';
+import { KeyRound, LayoutDashboard, PieChart, Receipt, Tags, Upload } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
-import { useTheme } from '../theme/useTheme';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -10,7 +9,6 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [isMobileChromeHidden, setIsMobileChromeHidden] = React.useState(false);
   const lastScrollYRef = React.useRef(0);
@@ -75,15 +73,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <strong>{currentNavItem.name}</strong>
           </div>
         </div>
-        <button
-          type="button"
-          className="theme-toggle"
-          onClick={toggleTheme}
-          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-        >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
       </header>
 
       <aside className="sidebar">
@@ -92,20 +81,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <h1 className="logo">mony</h1>
             <p className="sidebar-user">{user?.username}</p>
           </div>
-          <div className="sidebar-actions">
-            <button
-              type="button"
-              className="theme-toggle"
-              onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-            >
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-            <button className="sidebar-logout" onClick={() => void logout()} type="button">
-              Sign out
-            </button>
-          </div>
+          <button className="sidebar-logout" onClick={() => void logout()} type="button">
+            Sign out
+          </button>
         </div>
         <nav className="nav">
           {navItems.map((item) => (

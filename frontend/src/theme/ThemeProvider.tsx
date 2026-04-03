@@ -1,36 +1,70 @@
 import React from 'react';
-import { ThemeContext, type Theme } from './context';
+import { ThemeContext, type Theme, type ThemePreference } from './context';
 
 const STORAGE_KEY = 'mony-theme';
 
-function getInitialTheme(): Theme {
-  const storedTheme = window.localStorage.getItem(STORAGE_KEY);
-  if (storedTheme === 'light' || storedTheme === 'dark') {
-    return storedTheme;
-  }
-
+function getSystemTheme(): Theme {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+function getInitialPreference(): ThemePreference {
+  const storedTheme = window.localStorage.getItem(STORAGE_KEY);
+  if (storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system') {
+    return storedTheme;
+  }
+
+  return 'system';
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = React.useState<Theme>(getInitialTheme);
+  const [preference, setPreference] = React.useState<ThemePreference>(getInitialPreference());
+  const initialPreference = getInitialPreference();
+  const initialTheme: Theme =
+    initialPreference === 'system' ? getSystemTheme() : initialPreference;
+  const [theme, setTheme] = React.useState<Theme>(initialTheme);
+
+  React.useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEY, preference);
+
+    if (preference !== 'system') {
+      setTheme(preference);
+    }
+  }, [preference]);
+
+  React.useEffect(() => {
+    if (preference !== 'system') {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      setTheme(mediaQuery.matches ? 'dark' : 'light');
+    };
+
+    handleChange();
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, [preference]);
 
   React.useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
-    window.localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
-  const toggleTheme = React.useCallback(() => {
-    setTheme((currentTheme) => (currentTheme === 'light' ? 'dark' : 'light'));
+  const updatePreference = React.useCallback((nextPreference: ThemePreference) => {
+    setPreference(nextPreference);
   }, []);
 
   const value = React.useMemo(
     () => ({
       theme,
-      toggleTheme,
+      preference,
+      setPreference: updatePreference,
     }),
-    [theme, toggleTheme],
+    [preference, theme, updatePreference],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

@@ -3,6 +3,8 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { api } from '../services/api';
+import { useTheme } from '../theme/useTheme';
+import type { ThemePreference } from '../theme/context';
 import type { AuthEvent } from '../types';
 
 function formatError(error: unknown) {
@@ -18,6 +20,7 @@ function formatError(error: unknown) {
 export default function Account() {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
+  const { theme, preference, setPreference } = useTheme();
   const [events, setEvents] = React.useState<AuthEvent[]>([]);
   const [eventsError, setEventsError] = React.useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = React.useState('');
@@ -75,6 +78,11 @@ export default function Account() {
     }
   };
 
+  const handleSignOut = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <section className="settings-panel">
       <div className="settings-header">
@@ -84,6 +92,29 @@ export default function Account() {
           <p>{user?.username}</p>
         </div>
       </div>
+
+      <section className="settings-form">
+        <div className="settings-block-header">
+          <div>
+            <span className="settings-eyebrow">Appearance</span>
+            <h2>Theme</h2>
+            <p className="settings-empty">Currently using {theme} mode.</p>
+          </div>
+        </div>
+
+        <div className="segmented-control" aria-label="Theme preference">
+          {(['system', 'light', 'dark'] as ThemePreference[]).map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`segmented-option ${preference === option ? 'active' : ''}`}
+              onClick={() => setPreference(option)}
+            >
+              {labelForThemeOption(option)}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <form className="settings-form" onSubmit={handleSubmit}>
         <label className="auth-field">
@@ -132,6 +163,20 @@ export default function Account() {
       <section className="settings-form">
         <div className="settings-block-header">
           <div>
+            <span className="settings-eyebrow">Session</span>
+            <h2>Sign out</h2>
+            <p className="settings-empty">End the current web session on this device.</p>
+          </div>
+        </div>
+
+        <button className="button-secondary-inline" type="button" onClick={() => void handleSignOut()}>
+          Sign out
+        </button>
+      </section>
+
+      <section className="settings-form">
+        <div className="settings-block-header">
+          <div>
             <span className="settings-eyebrow">Security</span>
             <h2>Recent activity</h2>
           </div>
@@ -159,6 +204,19 @@ export default function Account() {
       </section>
     </section>
   );
+}
+
+function labelForThemeOption(option: ThemePreference) {
+  switch (option) {
+    case 'system':
+      return 'System';
+    case 'light':
+      return 'Light';
+    case 'dark':
+      return 'Dark';
+    default:
+      return option;
+  }
 }
 
 function labelForEvent(eventType: string) {
