@@ -1,5 +1,6 @@
 pub mod analytics;
 pub mod app;
+pub mod auth;
 pub mod categories;
 pub mod categorization;
 pub mod config;

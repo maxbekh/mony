@@ -1,7 +1,7 @@
 use std::{env, error::Error};
 
 use mony_backend::{
-    app::build_router, categorization::reapply_category_rules, config::AppConfig,
+    app::build_router, auth::AuthState, categorization::reapply_category_rules, config::AppConfig,
     db::connect_and_migrate, state::AppState,
 };
 use tokio::{net::TcpListener, signal};
@@ -15,6 +15,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let config = AppConfig::from_env()?;
     let pool = connect_and_migrate(&config.database).await?;
+    let auth = AuthState::new(&config.auth)?;
 
     if matches!(env::args().nth(1).as_deref(), Some("recategorize")) {
         let summary = reapply_category_rules(&pool).await?;
@@ -32,7 +33,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let address = config.address();
     let listener = TcpListener::bind(&address).await?;
-    let state = AppState { db: pool };
+    let state = AppState { db: pool, auth };
 
     info!(%address, "starting backend");
 

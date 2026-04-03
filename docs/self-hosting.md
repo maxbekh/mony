@@ -23,11 +23,24 @@ Available environment variables:
 
 - `MONY_HOST`
 - `MONY_PORT`
+- `MONY_AUTH_ISSUER`
+- `MONY_AUTH_AUDIENCE`
+- `MONY_AUTH_JWT_PRIVATE_KEY_PATH`
+- `MONY_AUTH_JWT_PUBLIC_KEY_PATH`
+- `MONY_AUTH_ACCESS_TOKEN_TTL_SECONDS`
+- `MONY_AUTH_REFRESH_TOKEN_TTL_DAYS`
+- `MONY_AUTH_SECURE_COOKIES`
 - `POSTGRES_HOST`
 - `POSTGRES_PORT`
 - `POSTGRES_DB`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
+
+Authentication notes:
+
+- Generate an RSA keypair and mount both files into the backend container. The backend signs short-lived JWT access tokens with the private key and publishes the public key through `/.well-known/jwks.json`.
+- The first account is created through the one-time bootstrap flow exposed at `POST /v1/auth/bootstrap` while no account exists. Public registration is intentionally disabled after that.
+- For production, terminate TLS in front of the app and set `MONY_AUTH_SECURE_COOKIES=true`.
 
 When running through Docker Compose, the backend service overrides the host and database address internally so it binds on `0.0.0.0` and connects to the `db` service.
 

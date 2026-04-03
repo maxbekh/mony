@@ -108,3 +108,39 @@ export interface StatusPayload {
   service: string;
   status: string;
 }
+
+export interface AuthUser {
+  id: string;
+  email: string;
+}
+
+export interface AuthSession {
+  id: string;
+  device_name: string | null;
+  user_agent: string | null;
+  ip_address: string | null;
+  created_at: string;
+  last_active_at: string;
+  revoked_at: string | null;
+}
+
+export interface AuthTokenPairResponse {
+  access_token: string;
+  token_type: 'Bearer';
+  expires_in: number;
+  scopes: string[];
+  user: AuthUser;
+  session: AuthSession;
+}
+
+export interface BootstrapStatusResponse {
+  bootstrap_required: boolean;
+  refresh_cookie_name: string;
+  csrf_cookie_name: string;
+}
+
+export interface AuthSessionViewResponse {
+  user: AuthUser;
+  scopes: string[];
+  session_id: string;
+}

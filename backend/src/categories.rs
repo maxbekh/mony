@@ -248,7 +248,8 @@ pub fn auto_categorize(description: &str) -> Option<String> {
 pub fn is_probable_legacy_salary_misclassification(description: &str) -> bool {
     let normalized_description = normalize_for_match(description);
 
-    auto_categorize(description).as_deref() != Some("income.salary") && normalized_description.contains("vir")
+    auto_categorize(description).as_deref() != Some("income.salary")
+        && normalized_description.contains("vir")
 }
 
 #[cfg(test)]
@@ -322,7 +323,9 @@ mod tests {
 
     #[test]
     fn flags_legacy_salary_false_positives() {
-        assert!(is_probable_legacy_salary_misclassification("VIR DE M SOMEONE"));
+        assert!(is_probable_legacy_salary_misclassification(
+            "VIR DE M SOMEONE"
+        ));
         assert!(!is_probable_legacy_salary_misclassification(
             "SALAIRE EMPLOYEUR ACME"
         ));
