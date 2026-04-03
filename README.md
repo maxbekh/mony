@@ -53,6 +53,24 @@ The categorization engine should evolve in layers instead of jumping directly to
 
 This order is intentional: the project should first become materially better with the data it already owns before depending on external intelligence.
 
+## Repository Boundary For Categorization
+
+The public repository must only contain the generic categorization engine:
+
+- generic normalization logic
+- generic rule matching
+- category definitions
+- local-memory loading hooks
+
+Any learned memory built from a real personal dataset must stay local and must not be committed. Examples include:
+
+- normalized merchant-to-category mappings learned from the current database
+- account- or person-specific transfer heuristics
+- employer-specific salary fingerprints
+- exported review artifacts derived from real transactions
+
+Those artifacts should live under ignored local paths such as `.local/` or `data/local-learning/`.
+
 ## Tech Stack
 
 - **Backend**: [Rust](https://www.rust-lang.org/) (Framework: [Axum](https://github.com/tokio-rs/axum)) - Chosen for security, memory safety, and high performance.

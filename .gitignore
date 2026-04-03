@@ -38,3 +38,8 @@ target/
 # Project-specific logs
 logs
 *.log
+
+# Local categorization memory and private analysis artifacts
+.local/
+data/local-learning/
+backend/local-learning/

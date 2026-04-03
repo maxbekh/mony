@@ -48,8 +48,8 @@ This file tracks the progress of the **mony** project.
 - [x] Dashboard: add selectable periods for summary views
 - [x] Product/UI: separate dashboard summaries from deeper analytics flows
 - [x] Transactions UX: add faster categorization and better sort/filter controls
-- [ ] Intelligent categorization: inspect current database categories and correct weak tags first
-- [ ] Intelligent categorization: derive stronger local rules from normalized descriptions, source metadata, and recurring patterns
+- [x] Intelligent categorization: inspect current database categories and correct weak tags first
+- [x] Intelligent categorization: derive stronger local rules from normalized descriptions, source metadata, and recurring patterns
 - [ ] Intelligent categorization: learn from confirmed historical categorizations already stored in the database
 - [ ] Intelligent categorization: add optional AI suggestions only for unresolved or low-confidence cases
 - [ ] Prepare authentication-friendly boundaries without implementing auth yet
@@ -60,6 +60,7 @@ This file tracks the progress of the **mony** project.
 - Authentication remains deferred, but route and state design should stay compatible with future protection and scoping.
 - Categorization work should start by mining the existing database for bad tags and repeated merchant patterns before introducing new external systems.
 - AI should be a last-layer suggestion mechanism, not the primary categorization source.
+- Learned categorization memory derived from a real local database must remain unversioned and outside the public repository.
 
 ## Infrastructure & DX
 

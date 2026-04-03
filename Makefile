@@ -1,6 +1,6 @@
 ENV_FILE ?= .env
 
-.PHONY: check foundation-check compose-config backend-check frontend-check frontend-build frontend-lint up-db down run-backend
+.PHONY: check foundation-check compose-config backend-check frontend-check frontend-build frontend-lint up-db down run-backend recategorize
 
 check: foundation-check backend-check frontend-check
 
@@ -39,3 +39,6 @@ down:
 
 run-backend:
 	cargo run -p mony-backend
+
+recategorize:
+	cargo run -p mony-backend -- recategorize
