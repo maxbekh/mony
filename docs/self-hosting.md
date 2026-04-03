@@ -52,6 +52,7 @@ Authentication notes:
 - The backend signs short-lived JWT access tokens with the private key and publishes the public key through `/.well-known/jwks.json`.
 - The first account is created through the one-time bootstrap flow exposed at `POST /v1/auth/bootstrap` while no account exists. Public registration is intentionally disabled after that.
 - Signed-in users can change their password from the web `Account` page.
+- The web `Account` page also shows recent security activity recorded by the backend.
 - If recovery is needed and you have server access, use `cargo run -p mony-backend -- reset-password <username>` to set a new password and revoke existing sessions.
 - For production, terminate TLS in front of the app and set `MONY_AUTH_SECURE_COOKIES=true`.
 

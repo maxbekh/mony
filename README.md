@@ -164,6 +164,7 @@ Then open:
 On first launch, browse to the web app and create the initial administrator account through the bootstrap login screen. Public registration is disabled after that first account exists.
 
 After sign-in, password changes are available from the `Account` page in the web app.
+Recent security activity is also visible from the same page, including sign-ins, failed sign-ins, password changes, and forced resets.
 
 ### 4. Stop the stack
 

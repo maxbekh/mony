@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type {
+  AuthEventListResponse,
   AuthSessionViewResponse,
   AuthTokenPairResponse,
   BootstrapStatusResponse,
@@ -115,6 +116,13 @@ export const api = {
 
   currentSession: async () => {
     const { data } = await client.get<AuthSessionViewResponse>('/v1/auth/session');
+    return data;
+  },
+
+  listAuthEvents: async (limit = 20) => {
+    const { data } = await client.get<AuthEventListResponse>('/v1/auth/events', {
+      params: { limit },
+    });
     return data;
   },
 
