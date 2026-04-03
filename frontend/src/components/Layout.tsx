@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Upload, PieChart, Menu } from 'lucide-react';
+import { LayoutDashboard, Receipt, Tags, Upload, PieChart, Menu } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -13,6 +13,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Transactions', path: '/transactions', icon: Receipt },
+    { name: 'Categorize', path: '/categorize', icon: Tags },
     { name: 'Import', path: '/import', icon: Upload },
     { name: 'Analytics', path: '/analytics', icon: PieChart },
   ];

@@ -41,6 +41,9 @@ export interface TransactionListParams {
   amount_max?: number;
   currency?: string;
   search?: string;
+  uncategorized_only?: boolean;
+  sort_by?: 'date' | 'amount' | 'category' | 'description';
+  sort_direction?: 'asc' | 'desc';
 }
 
 export interface TransactionUpdateParams {

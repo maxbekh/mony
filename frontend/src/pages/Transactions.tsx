@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { ChevronLeft, ChevronRight, Pencil, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, Pencil, Search, Tags, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import type { Category, Transaction, TransactionListParams } from '../types';
 
@@ -34,9 +35,27 @@ const Transactions: React.FC = () => {
     limit: 20,
     offset: 0,
     search: '',
+    category_key: '',
+    uncategorized_only: false,
+    sort_by: 'date',
+    sort_direction: 'desc',
   });
   const currentLimit = params.limit ?? 20;
   const currentOffset = params.offset ?? 0;
+
+  const categoryLabels = useMemo(
+    () =>
+      new Map(categories.map((category) => [category.key, category.label])),
+    [categories],
+  );
+
+  const getCategoryLabel = (categoryKey: string | null) => {
+    if (!categoryKey) {
+      return 'Uncategorized';
+    }
+
+    return categoryLabels.get(categoryKey) ?? categoryKey;
+  };
 
   const loadTransactions = async (requestParams: TransactionListParams) => {
     setLoading(true);
@@ -54,13 +73,6 @@ const Transactions: React.FC = () => {
   };
 
   useEffect(() => {
-    void loadTransactions({
-      limit: currentLimit,
-      offset: currentOffset,
-    });
-  }, [currentOffset, currentLimit]);
-
-  useEffect(() => {
     void (async () => {
       try {
         const response = await api.getCategories();
@@ -70,6 +82,26 @@ const Transactions: React.FC = () => {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    void loadTransactions({
+      limit: currentLimit,
+      offset: currentOffset,
+      search: params.search,
+      category_key: params.category_key,
+      uncategorized_only: params.uncategorized_only,
+      sort_by: params.sort_by,
+      sort_direction: params.sort_direction,
+    });
+  }, [
+    currentOffset,
+    currentLimit,
+    params.search,
+    params.category_key,
+    params.uncategorized_only,
+    params.sort_by,
+    params.sort_direction,
+  ]);
 
   const openEditor = (transaction: Transaction) => {
     setEditingTransaction(transaction);
@@ -87,6 +119,37 @@ const Transactions: React.FC = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setParams({ ...params, search: e.target.value, offset: 0 });
+  };
+
+  const handleCategoryFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setParams({
+      ...params,
+      category_key: e.target.value,
+      uncategorized_only: false,
+      offset: 0,
+    });
+  };
+
+  const handleUncategorizedToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setParams({
+      ...params,
+      uncategorized_only: checked,
+      category_key: checked ? '' : params.category_key,
+      offset: 0,
+    });
+  };
+
+  const handleSortByChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setParams({ ...params, sort_by: e.target.value as TransactionListParams['sort_by'], offset: 0 });
+  };
+
+  const handleSortDirectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setParams({
+      ...params,
+      sort_direction: e.target.value as TransactionListParams['sort_direction'],
+      offset: 0,
+    });
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -111,9 +174,7 @@ const Transactions: React.FC = () => {
       });
 
       setTransactions((current) =>
-        current.map((transaction) =>
-          transaction.id === updated.id ? updated : transaction,
-        ),
+        current.map((transaction) => (transaction.id === updated.id ? updated : transaction)),
       );
       closeEditor();
     } catch (error) {
@@ -144,23 +205,88 @@ const Transactions: React.FC = () => {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Transactions</h1>
-        <div className="page-actions">
-          <form onSubmit={handleSearchSubmit} className="search-form">
-            <Search size={18} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Search description..."
-              value={params.search}
-              onChange={handleSearchChange}
-              className="search-input"
-            />
-            <button type="submit" className="button primary search-submit">
-              Search
-            </button>
-          </form>
+        <div>
+          <h1>Transactions</h1>
+          <p className="text-muted">Search, sort, review, and categorize transactions.</p>
         </div>
+        <Link to="/categorize" className="button primary quick-link">
+          <Tags size={16} />
+          Quick categorize
+        </Link>
       </div>
+
+      <form onSubmit={handleSearchSubmit} className="toolbar-card">
+        <div className="search-form">
+          <Search size={18} className="search-icon" />
+          <input
+            type="text"
+            placeholder="Search description..."
+            value={params.search}
+            onChange={handleSearchChange}
+            className="search-input"
+          />
+          <button type="submit" className="button primary search-submit">
+            Search
+          </button>
+        </div>
+
+        <div className="filter-grid">
+          <label className="control">
+            <span className="control-label">
+              <Filter size={14} />
+              Category
+            </span>
+            <select
+              value={params.category_key ?? ''}
+              onChange={handleCategoryFilterChange}
+              className="control-input"
+              disabled={params.uncategorized_only}
+            >
+              <option value="">All categories</option>
+              {categories.map((category) => (
+                <option key={category.key} value={category.key}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="control">
+            <span className="control-label">Sort by</span>
+            <select
+              value={params.sort_by ?? 'date'}
+              onChange={handleSortByChange}
+              className="control-input"
+            >
+              <option value="date">Date</option>
+              <option value="amount">Amount</option>
+              <option value="category">Category</option>
+              <option value="description">Description</option>
+            </select>
+          </label>
+
+          <label className="control">
+            <span className="control-label">Direction</span>
+            <select
+              value={params.sort_direction ?? 'desc'}
+              onChange={handleSortDirectionChange}
+              className="control-input"
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </label>
+
+          <label className="checkbox-control">
+            <input
+              type="checkbox"
+              checked={params.uncategorized_only ?? false}
+              onChange={handleUncategorizedToggle}
+            />
+            <span>Only uncategorized</span>
+          </label>
+        </div>
+      </form>
 
       {pageError && <div className="notice error">{pageError}</div>}
 
@@ -199,12 +325,15 @@ const Transactions: React.FC = () => {
                       <div className="text-muted text-xs">{transaction.external_reference}</div>
                     )}
                   </td>
-                  <td>
+                  <td className="category-cell">
                     <span
                       className={`badge ${transaction.category_key ? 'category' : 'uncategorized'}`}
                     >
-                      {transaction.category_key || 'Uncategorized'}
+                      {getCategoryLabel(transaction.category_key)}
                     </span>
+                    {transaction.category_key && (
+                      <div className="text-muted text-xs category-key">{transaction.category_key}</div>
+                    )}
                   </td>
                   <td>
                     <div className="text-sm">{transaction.source_name}</div>
@@ -263,9 +392,7 @@ const Transactions: React.FC = () => {
             <div className="modal-header">
               <div>
                 <h2>Edit transaction</h2>
-                <p className="text-muted">
-                  Update the working description and manual category.
-                </p>
+                <p className="text-muted">Update the working description and manual category.</p>
               </div>
               <button type="button" className="icon-button" onClick={closeEditor}>
                 <X size={18} />
@@ -296,7 +423,7 @@ const Transactions: React.FC = () => {
                   <option value="">Uncategorized</option>
                   {categories.map((category) => (
                     <option key={category.key} value={category.key}>
-                      {category.label} ({category.key})
+                      {category.label}
                     </option>
                   ))}
                 </select>
@@ -342,18 +469,23 @@ const Transactions: React.FC = () => {
         .page {
           display: flex;
           flex-direction: column;
-          gap: 2rem;
+          gap: 1.5rem;
         }
         .page-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
+          gap: 1rem;
           flex-wrap: wrap;
-          gap: 1rem;
         }
-        .page-actions {
+        .toolbar-card {
           display: flex;
+          flex-direction: column;
           gap: 1rem;
+          background: white;
+          border: 1px solid var(--border-color);
+          border-radius: 0.75rem;
+          padding: 1rem;
         }
         .search-form {
           display: flex;
@@ -375,8 +507,45 @@ const Transactions: React.FC = () => {
           padding: 0;
           outline: none;
           font-size: 0.875rem;
-          width: 200px;
+          width: 100%;
           align-self: stretch;
+        }
+        .filter-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 0.75rem;
+          align-items: end;
+        }
+        .control {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+        .control-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        }
+        .control-input,
+        .form-input {
+          width: 100%;
+          min-height: 2.75rem;
+          border: 1px solid var(--border-color);
+          border-radius: 0.5rem;
+          padding: 0.75rem;
+          font-size: 0.875rem;
+          background: white;
+        }
+        .checkbox-control {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          min-height: 2.75rem;
+          padding: 0 0.25rem;
+          font-size: 0.875rem;
         }
         .card {
           background: white;
@@ -401,11 +570,31 @@ const Transactions: React.FC = () => {
         .table td {
           padding: 1rem 1.5rem;
           border-bottom: 1px solid var(--border-color);
-          vertical-align: middle;
+          vertical-align: top;
         }
         .table tr:last-child td {
           border-bottom: none;
         }
+        .transaction-description {
+          font-weight: 500;
+          color: var(--text-main);
+        }
+        .category-cell {
+          min-width: 170px;
+        }
+        .category-key {
+          margin-top: 0.3rem;
+        }
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 0.2rem 0.65rem;
+          border-radius: 9999px;
+          font-size: 0.75rem;
+          font-weight: 600;
+        }
+        .badge.category { background: #dbeafe; color: #1e40af; }
+        .badge.uncategorized { background: #f1f5f9; color: #475569; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
@@ -413,26 +602,20 @@ const Transactions: React.FC = () => {
         .text-sm { font-size: 0.875rem; }
         .text-xs { font-size: 0.75rem; }
         .text-muted { color: var(--text-muted); }
-        .transaction-description { font-weight: 500; color: var(--text-main); }
         .amount-negative { color: #ef4444; }
         .amount-positive { color: #10b981; }
-        .badge {
+        .button {
           display: inline-flex;
           align-items: center;
-          padding: 0.125rem 0.625rem;
-          border-radius: 9999px;
-          font-size: 0.75rem;
-          font-weight: 500;
-        }
-        .badge.category { background: #dbeafe; color: #1e40af; }
-        .badge.uncategorized { background: #f1f5f9; color: #475569; }
-        .button {
-          padding: 0.5rem 1rem;
-          border-radius: 0.375rem;
+          justify-content: center;
+          gap: 0.5rem;
+          padding: 0.55rem 0.95rem;
+          border-radius: 0.5rem;
           font-weight: 500;
           font-size: 0.875rem;
           cursor: pointer;
           border: 1px solid transparent;
+          text-decoration: none;
         }
         .button.primary {
           background: var(--primary-color);
@@ -441,6 +624,11 @@ const Transactions: React.FC = () => {
         .button.primary:hover {
           background: var(--primary-hover);
         }
+        .button.secondary {
+          background: white;
+          border-color: var(--border-color);
+          color: var(--text-main);
+        }
         .search-submit {
           align-self: stretch;
           border-radius: 0;
@@ -448,12 +636,11 @@ const Transactions: React.FC = () => {
           padding-left: 1rem;
           padding-right: 1rem;
         }
-        .button.secondary {
-          background: white;
-          border-color: var(--border-color);
-          color: var(--text-main);
+        .quick-link {
+          flex-shrink: 0;
         }
-        .button:disabled, .icon-button:disabled {
+        .button:disabled,
+        .icon-button:disabled {
           opacity: 0.6;
           cursor: not-allowed;
         }
@@ -524,21 +711,6 @@ const Transactions: React.FC = () => {
           flex-direction: column;
           gap: 0.5rem;
         }
-        .form-group label {
-          font-size: 0.875rem;
-          font-weight: 600;
-        }
-        .form-input {
-          width: 100%;
-          padding: 0.75rem;
-          border-radius: 0.5rem;
-          border: 1px solid var(--border-color);
-          font-size: 0.875rem;
-          outline: none;
-        }
-        .form-input:focus {
-          border-color: var(--primary-color);
-        }
         .summary-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -562,6 +734,11 @@ const Transactions: React.FC = () => {
           justify-content: flex-end;
           gap: 0.75rem;
         }
+        @media (max-width: 1080px) {
+          .filter-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
         @media (max-width: 900px) {
           .table th:nth-child(4),
           .table td:nth-child(4) {
@@ -569,14 +746,8 @@ const Transactions: React.FC = () => {
           }
         }
         @media (max-width: 640px) {
-          .search-form {
-            width: 100%;
-          }
-          .search-input {
-            width: 100%;
-          }
-          .search-submit {
-            flex-shrink: 0;
+          .filter-grid {
+            grid-template-columns: 1fr;
           }
           .summary-grid {
             grid-template-columns: 1fr;
