@@ -5,12 +5,20 @@ import { useAuth } from '../auth/useAuth';
 
 function formatError(error: unknown) {
   if (axios.isAxiosError(error)) {
-    return typeof error.response?.data === 'string'
-      ? error.response.data
-      : 'Authentication failed.';
+    if (typeof error.response?.data === 'string') {
+      const message = error.response.data.trim();
+      if (!message) {
+        return 'Unable to sign in.';
+      }
+
+      const normalized = message.charAt(0).toUpperCase() + message.slice(1);
+      return normalized.endsWith('.') ? normalized : `${normalized}.`;
+    }
+
+    return 'Unable to sign in.';
   }
 
-  return 'Authentication failed.';
+  return 'Unable to sign in.';
 }
 
 export default function Login() {
@@ -89,7 +97,12 @@ export default function Login() {
             ) : null}
           </label>
 
-          {errorMessage ? <p className="auth-error">{errorMessage}</p> : null}
+          {errorMessage ? (
+            <div aria-live="polite" className="auth-error-card" role="alert">
+              <strong>Unable to sign in</strong>
+              <p className="auth-error">{errorMessage}</p>
+            </div>
+          ) : null}
 
           <button className="auth-submit" disabled={isSubmitting} type="submit">
             {isSubmitting ? 'Please wait…' : bootstrapRequired ? 'Create administrator' : 'Sign in'}
