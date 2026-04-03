@@ -1,6 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { ArrowDownCircle, ArrowUpCircle, CalendarSearch, LineChart, PieChart, TableProperties } from 'lucide-react';
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  CalendarSearch,
+  LineChart,
+  PieChart,
+  TableProperties,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 import { api } from '../services/api';
 import type { Category, MonthlySpendingByCategory, SpendingByCategory } from '../types';
 
@@ -27,6 +36,10 @@ function daysAgoIsoDate(days: number) {
   const date = new Date();
   date.setDate(date.getDate() - days);
   return date.toISOString().slice(0, 10);
+}
+
+function parseIsoDateAtUtc(isoDate: string) {
+  return new Date(`${isoDate}T00:00:00Z`);
 }
 
 const INITIAL_DATE_FROM = daysAgoIsoDate(89);
@@ -117,19 +130,56 @@ const Analytics: React.FC = () => {
   const trendRows = selectedTrendRows.map((row) => ({
     ...row,
     absolute_amount_minor: Math.abs(row.total_amount_minor),
-    label: new Date(`${row.month_start}T00:00:00Z`).toLocaleDateString('en-US', {
+    label: parseIsoDateAtUtc(row.month_start).toLocaleDateString('en-US', {
       month: 'short',
       year: 'numeric',
       timeZone: 'UTC',
     }),
   }));
   const trendMax = trendRows.reduce((max, row) => Math.max(max, row.absolute_amount_minor), 0);
+  const chartWidth = 760;
+  const chartHeight = 260;
+  const chartPadding = 28;
+  const chartInnerWidth = chartWidth - chartPadding * 2;
+  const chartInnerHeight = chartHeight - chartPadding * 2;
+  const svgTrendPoints = trendRows.map((row, index) => {
+    const x =
+      trendRows.length <= 1
+        ? chartWidth / 2
+        : chartPadding + (index / (trendRows.length - 1)) * chartInnerWidth;
+    const y =
+      trendMax === 0
+        ? chartHeight - chartPadding
+        : chartHeight - chartPadding - (row.absolute_amount_minor / trendMax) * chartInnerHeight;
+
+    return {
+      ...row,
+      x,
+      y,
+    };
+  });
+  const linePath = svgTrendPoints
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+    .join(' ');
+  const areaPath = svgTrendPoints.length === 0
+    ? ''
+    : `${linePath} L ${svgTrendPoints[svgTrendPoints.length - 1].x} ${chartHeight - chartPadding} L ${svgTrendPoints[0].x} ${chartHeight - chartPadding} Z`;
   const trendLatest = trendRows[trendRows.length - 1];
   const trendPrevious = trendRows[trendRows.length - 2];
   const rollingAverage =
     trendRows.length === 0
       ? 0
       : trendRows.reduce((sum, row) => sum + row.absolute_amount_minor, 0) / trendRows.length;
+  const trendDelta =
+    trendLatest && trendPrevious
+      ? trendLatest.absolute_amount_minor - trendPrevious.absolute_amount_minor
+      : null;
+  const trendDeltaPercent =
+    trendDelta !== null && trendPrevious && trendPrevious.absolute_amount_minor > 0
+      ? (trendDelta / trendPrevious.absolute_amount_minor) * 100
+      : null;
+  const spotlightSpending = spendingRows.slice(0, 3);
+  const spendingLeader = spotlightSpending[0];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,24 +223,36 @@ const Analytics: React.FC = () => {
           </label>
 
           <div className="preset-group">
-            <button type="button" className="button secondary" onClick={() => {
-              setDateFrom(daysAgoIsoDate(29));
-              setDateTo(todayIsoDate());
-            }}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => {
+                setDateFrom(daysAgoIsoDate(29));
+                setDateTo(todayIsoDate());
+              }}
+            >
               30 days
             </button>
-            <button type="button" className="button secondary" onClick={() => {
-              setDateFrom(daysAgoIsoDate(89));
-              setDateTo(todayIsoDate());
-            }}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => {
+                setDateFrom(daysAgoIsoDate(89));
+                setDateTo(todayIsoDate());
+              }}
+            >
               90 days
             </button>
-            <button type="button" className="button secondary" onClick={() => {
-              const date = new Date();
-              date.setFullYear(date.getFullYear() - 1);
-              setDateFrom(date.toISOString().slice(0, 10));
-              setDateTo(todayIsoDate());
-            }}>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => {
+                const date = new Date();
+                date.setFullYear(date.getFullYear() - 1);
+                setDateFrom(date.toISOString().slice(0, 10));
+                setDateTo(todayIsoDate());
+              }}
+            >
               12 months
             </button>
           </div>
@@ -242,6 +304,92 @@ const Analytics: React.FC = () => {
         </div>
       </div>
 
+      <div className="spotlight-grid">
+        <div className="card spotlight-card spend-lead">
+          <div className="card-header compact">
+            <TrendingDown size={18} />
+            <h2>Top spending pressure</h2>
+          </div>
+          <div className="card-body">
+            {loading ? (
+              <p className="empty">Loading top category...</p>
+            ) : spendingLeader ? (
+              <div className="spotlight-body">
+                <strong className="spotlight-title">{getCategoryLabel(spendingLeader.category_key)}</strong>
+                <div className="spotlight-amount">
+                  {formatAmount(Math.abs(spendingLeader.total_amount_minor), spendingLeader.currency)}
+                </div>
+                <p className="spotlight-copy">
+                  {totalSpending === 0
+                    ? 'No category share yet.'
+                    : `${((Math.abs(spendingLeader.total_amount_minor) / totalSpending) * 100).toFixed(1)}% of all spending in the selected period.`}
+                </p>
+              </div>
+            ) : (
+              <p className="empty">No spending data for this period.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="card spotlight-card trend-lead">
+          <div className="card-header compact">
+            <TrendingUp size={18} />
+            <h2>Trend signal</h2>
+          </div>
+          <div className="card-body">
+            {loading ? (
+              <p className="empty">Calculating trend signal...</p>
+            ) : trendRows.length < 2 ? (
+              <p className="empty">Need at least two months to calculate a trend signal.</p>
+            ) : (
+              <div className="spotlight-body">
+                <strong className="spotlight-title">{getCategoryLabel(selectedCategory)}</strong>
+                <div className={`spotlight-amount ${trendDelta !== null && trendDelta > 0 ? 'negative' : 'positive'}`}>
+                  {trendDelta === null
+                    ? 'N/A'
+                    : `${trendDelta > 0 ? '+' : ''}${formatAmount(trendDelta, trendLatest?.currency ?? 'EUR')}`}
+                </div>
+                <p className="spotlight-copy">
+                  {trendDeltaPercent !== null
+                    ? `${(trendDelta ?? 0) > 0 ? 'Up' : 'Down'} ${Math.abs(trendDeltaPercent).toFixed(1)}% versus previous month.`
+                    : 'No reliable percentage yet for this category.'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="card spotlight-card mix-lead">
+          <div className="card-header compact">
+            <PieChart size={18} />
+            <h2>Category mix</h2>
+          </div>
+          <div className="card-body">
+            {loading ? (
+              <p className="empty">Loading mix...</p>
+            ) : spotlightSpending.length === 0 ? (
+              <p className="empty">No category mix available.</p>
+            ) : (
+              <div className="mix-list">
+                {spotlightSpending.map((row, index) => {
+                  const share = totalSpending === 0 ? 0 : (Math.abs(row.total_amount_minor) / totalSpending) * 100;
+
+                  return (
+                    <div key={`${row.category_key ?? 'uncategorized'}-${index}`} className="mix-item">
+                      <div className="mix-rank">{index + 1}</div>
+                      <div className="mix-copy">
+                        <strong>{getCategoryLabel(row.category_key)}</strong>
+                        <span>{share.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="analytics-grid">
         <div className="card">
           <div className="card-header">
@@ -255,13 +403,16 @@ const Analytics: React.FC = () => {
               <p className="empty">No spending data for this period.</p>
             ) : (
               <div className="stack-list">
-                {spendingRows.map((row) => {
+                {spendingRows.map((row, index) => {
                   const share = totalSpending === 0 ? 0 : (Math.abs(row.total_amount_minor) / totalSpending) * 100;
 
                   return (
                     <div key={`spend-${row.category_key ?? 'uncategorized'}`} className="stack-item">
                       <div className="stack-row">
-                        <span>{getCategoryLabel(row.category_key)}</span>
+                        <span className="stack-label">
+                          <span className="stack-rank">{index + 1}</span>
+                          <span>{getCategoryLabel(row.category_key)}</span>
+                        </span>
                         <strong>{formatAmount(Math.abs(row.total_amount_minor), row.currency)}</strong>
                       </div>
                       <div className="bar-track">
@@ -291,13 +442,16 @@ const Analytics: React.FC = () => {
               <p className="empty">No income data for this period.</p>
             ) : (
               <div className="stack-list">
-                {incomeRows.map((row) => {
+                {incomeRows.map((row, index) => {
                   const share = totalIncome === 0 ? 0 : (row.total_amount_minor / totalIncome) * 100;
 
                   return (
                     <div key={`income-${row.category_key ?? 'uncategorized'}`} className="stack-item">
                       <div className="stack-row">
-                        <span>{getCategoryLabel(row.category_key)}</span>
+                        <span className="stack-label">
+                          <span className="stack-rank income-rank">{index + 1}</span>
+                          <span>{getCategoryLabel(row.category_key)}</span>
+                        </span>
                         <strong>{formatAmount(row.total_amount_minor, row.currency)}</strong>
                       </div>
                       <div className="bar-track">
@@ -346,23 +500,56 @@ const Analytics: React.FC = () => {
 
           {loading ? (
             <p className="empty">Loading trend...</p>
-          ) : trendRows.length === 0 ? (
-            <p className="empty">No monthly trend is available for this category in the selected period.</p>
+          ) : trendRows.length < 2 ? (
+            <p className="empty">Not enough monthly data to render a curve for this category.</p>
           ) : (
             <>
-              <div className="trend-chart">
-                {trendRows.map((row) => (
-                  <div key={`${row.month_start}-${row.category_key ?? 'uncategorized'}`} className="trend-column">
-                    <div
-                      className="trend-bar"
-                      style={{
-                        height: `${trendMax === 0 ? 0 : Math.max((row.absolute_amount_minor / trendMax) * 100, 8)}%`,
-                      }}
-                    />
-                    <strong>{formatAmount(row.absolute_amount_minor, row.currency)}</strong>
-                    <span>{row.label}</span>
-                  </div>
-                ))}
+              <div className="trend-chart trend-line-chart">
+                <svg
+                  className="trend-svg"
+                  viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                  role="img"
+                  aria-label={`Monthly spending trend for ${getCategoryLabel(selectedCategory)}`}
+                >
+                  <defs>
+                    <linearGradient id="analyticsTrendAreaGradient" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#0f766e" stopOpacity="0.24" />
+                      <stop offset="100%" stopColor="#0f766e" stopOpacity="0.03" />
+                    </linearGradient>
+                    <linearGradient id="analyticsTrendLineGradient" x1="0" x2="1" y1="0" y2="0">
+                      <stop offset="0%" stopColor="#14b8a6" />
+                      <stop offset="100%" stopColor="#0f766e" />
+                    </linearGradient>
+                  </defs>
+                  {[0, 1, 2, 3].map((index) => {
+                    const y = chartPadding + (index / 3) * chartInnerHeight;
+                    return (
+                      <line
+                        key={index}
+                        x1={chartPadding}
+                        x2={chartWidth - chartPadding}
+                        y1={y}
+                        y2={y}
+                        className="trend-grid-line"
+                      />
+                    );
+                  })}
+                  <path d={areaPath} className="trend-area" />
+                  <path d={linePath} className="trend-line" />
+                  {svgTrendPoints.map((point) => (
+                    <g key={`${point.month_start}-${point.category_key ?? 'uncategorized'}`}>
+                      <circle cx={point.x} cy={point.y} r="5" className="trend-dot" />
+                    </g>
+                  ))}
+                </svg>
+                <div className="trend-axis">
+                  {trendRows.map((row) => (
+                    <div key={`${row.month_start}-${row.category_key ?? 'uncategorized'}`} className="trend-axis-item">
+                      <span>{row.label}</span>
+                      <strong>{formatAmount(row.absolute_amount_minor, row.currency)}</strong>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="trend-insights">
@@ -558,6 +745,11 @@ const Analytics: React.FC = () => {
           grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
           gap: 1rem;
         }
+        .spotlight-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 1rem;
+        }
         .stat-card {
           background: var(--surface-color);
           border: 1px solid var(--border-color);
@@ -592,6 +784,78 @@ const Analytics: React.FC = () => {
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 1rem;
         }
+        .compact {
+          padding-bottom: 0.85rem;
+        }
+        .spotlight-card .card-body {
+          min-height: 168px;
+        }
+        .spend-lead {
+          background:
+            radial-gradient(circle at top left, rgba(239, 68, 68, 0.12), transparent 34%),
+            var(--surface-color);
+        }
+        .trend-lead {
+          background:
+            radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 34%),
+            var(--surface-color);
+        }
+        .mix-lead {
+          background:
+            radial-gradient(circle at top left, rgba(59, 130, 246, 0.13), transparent 34%),
+            var(--surface-color);
+        }
+        .spotlight-body {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .spotlight-title {
+          font-size: 1rem;
+        }
+        .spotlight-amount {
+          font-size: 1.7rem;
+          line-height: 1;
+          font-weight: 800;
+        }
+        .spotlight-copy {
+          color: var(--text-muted);
+          font-size: 0.9rem;
+          line-height: 1.45;
+        }
+        .mix-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.7rem;
+        }
+        .mix-item {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.85rem 0.9rem;
+          border: 1px solid var(--border-color);
+          border-radius: 0.9rem;
+          background: var(--surface-muted);
+        }
+        .mix-rank {
+          width: 2rem;
+          height: 2rem;
+          border-radius: 999px;
+          background: var(--surface-accent);
+          color: var(--primary-color);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.8rem;
+          font-weight: 700;
+          flex: 0 0 auto;
+        }
+        .mix-copy {
+          display: flex;
+          justify-content: space-between;
+          gap: 1rem;
+          width: 100%;
+        }
         .trend-section {
           display: flex;
           flex-direction: column;
@@ -606,34 +870,60 @@ const Analytics: React.FC = () => {
           min-width: min(100%, 280px);
         }
         .trend-chart {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
-          gap: 0.85rem;
-          align-items: end;
-          min-height: 280px;
           padding: 1rem;
           border-radius: 1rem;
           background:
-            linear-gradient(180deg, color-mix(in srgb, #f97316 10%, transparent), transparent 45%),
+            linear-gradient(180deg, color-mix(in srgb, #14b8a6 12%, transparent), transparent 45%),
             var(--surface-muted);
         }
-        .trend-column {
-          min-height: 240px;
+        .trend-line-chart {
           display: flex;
           flex-direction: column;
-          justify-content: end;
-          gap: 0.4rem;
+          gap: 1rem;
         }
-        .trend-bar {
-          border-radius: 0.9rem 0.9rem 0.35rem 0.35rem;
-          background: linear-gradient(180deg, #fb923c 0%, #ea580c 55%, #dc2626 100%);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+        .trend-svg {
+          width: 100%;
+          height: auto;
         }
-        .trend-column span {
+        .trend-grid-line {
+          stroke: color-mix(in srgb, var(--text-muted) 18%, transparent);
+          stroke-width: 1;
+        }
+        .trend-area {
+          fill: url(#analyticsTrendAreaGradient);
+        }
+        .trend-line {
+          fill: none;
+          stroke: url(#analyticsTrendLineGradient);
+          stroke-width: 4;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          filter: drop-shadow(0 7px 18px rgba(15, 118, 110, 0.18));
+        }
+        .trend-dot {
+          fill: var(--surface-color);
+          stroke: #0f766e;
+          stroke-width: 3;
+        }
+        .trend-axis {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+          gap: 0.75rem;
+        }
+        .trend-axis-item {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+          padding: 0.8rem 0.9rem;
+          border: 1px solid var(--border-color);
+          border-radius: 0.9rem;
+          background: var(--surface-color);
+        }
+        .trend-axis-item span {
           color: var(--text-muted);
           font-size: 0.75rem;
         }
-        .trend-column strong {
+        .trend-axis-item strong {
           font-size: 0.84rem;
         }
         .trend-insights {
@@ -666,6 +956,10 @@ const Analytics: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 0.45rem;
+          padding: 0.85rem 0.95rem;
+          border-radius: 0.95rem;
+          border: 1px solid var(--border-color);
+          background: var(--surface-muted);
         }
         .stack-row,
         .stack-meta {
@@ -677,19 +971,42 @@ const Analytics: React.FC = () => {
           color: var(--text-muted);
           font-size: 0.75rem;
         }
+        .stack-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.65rem;
+          min-width: 0;
+        }
+        .stack-rank {
+          width: 1.55rem;
+          height: 1.55rem;
+          border-radius: 999px;
+          background: rgba(239, 68, 68, 0.12);
+          color: var(--danger-text);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.72rem;
+          font-weight: 700;
+          flex: 0 0 auto;
+        }
+        .income-rank {
+          background: rgba(34, 197, 94, 0.14);
+          color: var(--success-text);
+        }
         .bar-track {
-          height: 0.5rem;
+          height: 0.65rem;
           border-radius: 999px;
           background: var(--surface-subtle);
           overflow: hidden;
         }
         .bar-fill {
           height: 100%;
-          background: #ef4444;
+          background: linear-gradient(90deg, #f97316 0%, #dc2626 100%);
           border-radius: 999px;
         }
         .income-fill {
-          background: #22c55e;
+          background: linear-gradient(90deg, #4ade80 0%, #16a34a 100%);
         }
         .table-scroll {
           overflow-x: auto;
@@ -758,14 +1075,12 @@ const Analytics: React.FC = () => {
           color: var(--text-muted);
         }
         @media (max-width: 980px) {
+          .spotlight-grid,
           .analytics-grid {
             grid-template-columns: 1fr;
           }
           .date-controls {
             grid-template-columns: 1fr 1fr;
-          }
-          .trend-chart {
-            grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
           }
         }
         @media (max-width: 720px) {
@@ -786,7 +1101,8 @@ const Analytics: React.FC = () => {
           .mobile-analytics-list {
             display: grid;
           }
-          .stats-grid {
+          .stats-grid,
+          .spotlight-grid {
             grid-template-columns: 1fr;
           }
         }
