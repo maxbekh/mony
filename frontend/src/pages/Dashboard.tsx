@@ -484,20 +484,25 @@ const Dashboard: React.FC = () => {
             ) : period === 'all' ? (
               <p className="text-center py-8">Comparison is disabled for all-time view.</p>
             ) : (
-              <div className="comparison-metrics">
-                <div className="comparison-metric">
+              <div className="comparison-strip">
+                <div className="comparison-metric major">
                   <span className="metric-label">Spending</span>
-                  <strong>{formatAmount(totalSpending)}</strong>
+                  <strong className="metric-value">{formatAmount(totalSpending)}</strong>
+                  <span className="metric-baseline">Before {formatAmount(previousTotalSpending)}</span>
                   {renderDelta(totalSpendingDelta, 'EUR', totalSpendingDeltaPercent)}
                 </div>
+                <div className="comparison-divider" aria-hidden="true" />
                 <div className="comparison-metric">
                   <span className="metric-label">Income</span>
-                  <strong>{formatAmount(totalIncome)}</strong>
+                  <strong className="metric-value">{formatAmount(totalIncome)}</strong>
+                  <span className="metric-baseline">Before {formatAmount(previousTotalIncome)}</span>
                   {renderDelta(totalIncomeDelta, 'EUR', totalIncomeDeltaPercent)}
                 </div>
+                <div className="comparison-divider" aria-hidden="true" />
                 <div className="comparison-metric">
                   <span className="metric-label">Net</span>
-                  <strong>{formatAmount(totalNet)}</strong>
+                  <strong className="metric-value">{formatAmount(totalNet)}</strong>
+                  <span className="metric-baseline">Before {formatAmount(previousTotalNet)}</span>
                   {renderDelta(totalNetDelta, 'EUR', totalNetDeltaPercent)}
                 </div>
               </div>
@@ -846,26 +851,43 @@ const Dashboard: React.FC = () => {
           text-transform: uppercase;
           letter-spacing: 0.04em;
         }
-        .comparison-metrics {
+        .comparison-strip {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 0.9rem;
+          grid-template-columns: minmax(0, 1.15fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+          align-items: stretch;
+          gap: 0;
+          border-top: 1px solid var(--border-color);
+          border-bottom: 1px solid var(--border-color);
         }
         .comparison-metric {
           display: flex;
           flex-direction: column;
-          gap: 0.6rem;
-          padding: 1rem;
-          border-radius: 1rem;
-          border: 1px solid var(--border-color);
-          background: var(--surface-color);
-          box-shadow: inset 0 1px 0 color-mix(in srgb, white 12%, transparent);
+          gap: 0.45rem;
+          padding: 1.1rem 1rem;
+          min-width: 0;
+        }
+        .comparison-metric.major {
+          padding-left: 0;
         }
         .metric-label {
           color: var(--text-muted);
-          font-size: 0.8rem;
+          font-size: 0.74rem;
           text-transform: uppercase;
           letter-spacing: 0.05em;
+        }
+        .metric-value {
+          font-size: 1.35rem;
+          line-height: 1.1;
+        }
+        .metric-baseline {
+          color: var(--text-muted);
+          font-size: 0.8rem;
+        }
+        .comparison-divider {
+          width: 1px;
+          background: var(--border-color);
+          align-self: stretch;
+          margin: 0.65rem 0;
         }
         .delta-pill {
           display: inline-flex;
@@ -923,20 +945,22 @@ const Dashboard: React.FC = () => {
           justify-content: space-between;
           gap: 1rem;
           align-items: center;
-          padding: 1rem;
-          border-radius: 1rem;
-          border: 1px solid var(--border-color);
-          background: var(--surface-muted);
+          padding: 1rem 0;
+          border-radius: 0;
+          border: none;
+          border-bottom: 1px solid var(--border-color);
+          background: transparent;
+        }
+        .mover-list .mover-item:last-child {
+          border-bottom: none;
         }
         .mover-item.rise {
           background:
-            linear-gradient(135deg, color-mix(in srgb, var(--danger-bg) 42%, transparent), transparent 50%),
-            var(--surface-muted);
+            linear-gradient(90deg, color-mix(in srgb, var(--danger-bg) 58%, transparent), transparent 38%);
         }
         .mover-item.calm {
           background:
-            linear-gradient(135deg, color-mix(in srgb, var(--success-surface) 42%, transparent), transparent 50%),
-            var(--surface-muted);
+            linear-gradient(90deg, color-mix(in srgb, var(--success-surface) 58%, transparent), transparent 38%);
         }
         .card-body {
           padding: 1.5rem;
@@ -1137,6 +1161,21 @@ const Dashboard: React.FC = () => {
           }
           .comparison-grid {
             grid-template-columns: 1fr;
+          }
+          .comparison-strip {
+            grid-template-columns: 1fr;
+            border-bottom: none;
+          }
+          .comparison-divider {
+            display: none;
+          }
+          .comparison-metric {
+            padding-left: 0;
+            padding-right: 0;
+            border-bottom: 1px solid var(--border-color);
+          }
+          .comparison-strip .comparison-metric:last-child {
+            border-bottom: none;
           }
           .mover-item {
             flex-direction: column;

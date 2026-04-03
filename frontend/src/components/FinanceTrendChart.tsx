@@ -271,7 +271,7 @@ export const FinanceTrendChart: React.FC<FinanceTrendChartProps> = ({
         style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`,
-          gap: '0.75rem',
+          gap: '0.65rem',
         }}
       >
         {points.map((point, index) => {
@@ -284,17 +284,28 @@ export const FinanceTrendChart: React.FC<FinanceTrendChartProps> = ({
               onFocus={() => setHoveredIndex(index)}
               onClick={() => setHoveredIndex(index === activeIndex ? null : index)}
               style={{
-                border: '1px solid var(--border-color)',
-                background: isActive ? 'var(--surface-elevated)' : 'var(--surface-color)',
-                borderRadius: '0.9rem',
-                padding: '0.8rem 0.9rem',
+                border: 'none',
+                borderTop: `1px solid ${isActive ? 'color-mix(in srgb, var(--primary-color) 28%, transparent)' : 'var(--border-color)'}`,
+                background: 'transparent',
+                borderRadius: '0',
+                padding: '0.72rem 0.2rem 0 0.2rem',
                 textAlign: 'left',
                 cursor: 'pointer',
-                transition: 'transform 180ms ease, border-color 180ms ease, background 180ms ease',
+                transition: 'transform 180ms ease, border-color 180ms ease, opacity 180ms ease',
                 transform: isActive ? 'translateY(-1px)' : 'translateY(0)',
+                opacity: isActive ? 1 : 0.86,
               }}
             >
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{point.label}</div>
+              <div
+                style={{
+                  color: isActive ? 'var(--text-main)' : 'var(--text-muted)',
+                  fontSize: '0.72rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {point.label}
+              </div>
               <div style={{ fontSize: '0.86rem', fontWeight: 700, marginTop: '0.3rem' }}>
                 {formatAmount(point.valueMinor, point.currency)}
               </div>
@@ -307,7 +318,7 @@ export const FinanceTrendChart: React.FC<FinanceTrendChartProps> = ({
                 style={{
                   marginTop: '0.55rem',
                   height: '2px',
-                  width: isActive ? '100%' : '36%',
+                  width: isActive ? '100%' : '22%',
                   borderRadius: '999px',
                   background: `linear-gradient(90deg, ${palette.lineStart} 0%, ${palette.lineEnd} 100%)`,
                   opacity: isActive ? 1 : 0.45,

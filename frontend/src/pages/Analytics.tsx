@@ -681,7 +681,7 @@ const Analytics: React.FC = () => {
         }
         .spotlight-grid {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: 1.2fr 1fr 0.9fr;
           gap: 1rem;
         }
         .stat-card {
@@ -721,21 +721,29 @@ const Analytics: React.FC = () => {
         .compact {
           padding-bottom: 0.85rem;
         }
+        .spotlight-card {
+          border-radius: 1.25rem;
+          border: none;
+          box-shadow: none;
+        }
         .spotlight-card .card-body {
           min-height: 168px;
         }
         .spend-lead {
           background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.4)),
             radial-gradient(circle at top left, rgba(239, 68, 68, 0.12), transparent 34%),
             var(--surface-color);
         }
         .trend-lead {
           background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.4)),
             radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 34%),
             var(--surface-color);
         }
         .mix-lead {
           background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.4)),
             radial-gradient(circle at top left, rgba(59, 130, 246, 0.13), transparent 34%),
             var(--surface-color);
         }
@@ -766,10 +774,12 @@ const Analytics: React.FC = () => {
           display: flex;
           align-items: center;
           gap: 0.75rem;
-          padding: 0.85rem 0.9rem;
-          border: 1px solid var(--border-color);
-          border-radius: 0.9rem;
-          background: var(--surface-muted);
+          padding: 0.8rem 0;
+          border-bottom: 1px solid var(--border-color);
+          background: transparent;
+        }
+        .mix-item:last-child {
+          border-bottom: none;
         }
         .mix-rank {
           width: 2rem;
@@ -866,8 +876,8 @@ const Analytics: React.FC = () => {
           gap: 0.75rem;
         }
         .trend-insight-card {
-          background: var(--surface-muted);
-          border: 1px solid var(--border-color);
+          background: linear-gradient(180deg, color-mix(in srgb, var(--surface-muted) 80%, white 20%), var(--surface-color));
+          border: none;
           border-radius: 0.9rem;
           padding: 1rem;
         }
@@ -890,10 +900,12 @@ const Analytics: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 0.45rem;
-          padding: 0.85rem 0.95rem;
-          border-radius: 0.95rem;
-          border: 1px solid var(--border-color);
-          background: var(--surface-muted);
+          padding: 0.85rem 0;
+          border-bottom: 1px solid var(--border-color);
+          background: transparent;
+        }
+        .stack-item:last-child {
+          border-bottom: none;
         }
         .stack-row,
         .stack-meta {
