@@ -20,6 +20,7 @@ import type {
 } from '../types';
 
 type PeriodKey = '30d' | '90d' | '12m' | 'all';
+type TrendRangeKey = '6m' | '12m';
 
 const PERIOD_OPTIONS: Array<{ key: PeriodKey; label: string; description: string }> = [
   { key: '30d', label: '30 days', description: 'Recent monthly view' },
@@ -28,15 +29,10 @@ const PERIOD_OPTIONS: Array<{ key: PeriodKey; label: string; description: string
   { key: 'all', label: 'All time', description: 'Full imported history' },
 ];
 
-const FALLBACK_TREND_RANGE: AnalyticsQueryParams = {
-  date_from: (() => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - 5);
-    date.setDate(1);
-    return formatDateInput(date);
-  })(),
-  date_to: formatDateInput(new Date()),
-};
+const TREND_RANGE_OPTIONS: Array<{ key: TrendRangeKey; label: string }> = [
+  { key: '6m', label: '6 months' },
+  { key: '12m', label: '12 months' },
+];
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (axios.isAxiosError(error)) {
@@ -153,8 +149,21 @@ function formatDeltaPercent(delta: number, baseline: number) {
   return (delta / baseline) * 100;
 }
 
+function buildTrendParams(range: TrendRangeKey): AnalyticsQueryParams {
+  const today = new Date();
+  const start = new Date(today);
+  start.setUTCDate(1);
+  start.setUTCMonth(today.getUTCMonth() - (range === '6m' ? 5 : 11));
+
+  return {
+    date_from: formatDateInput(start),
+    date_to: formatDateInput(today),
+  };
+}
+
 const Dashboard: React.FC = () => {
   const [period, setPeriod] = useState<PeriodKey>('30d');
+  const [trendRange, setTrendRange] = useState<TrendRangeKey>('6m');
   const [analytics, setAnalytics] = useState<SpendingByCategory[]>([]);
   const [previousAnalytics, setPreviousAnalytics] = useState<SpendingByCategory[]>([]);
   const [monthlyAnalytics, setMonthlyAnalytics] = useState<MonthlySpendingByCategory[]>([]);
@@ -171,12 +180,13 @@ const Dashboard: React.FC = () => {
       try {
         const periodParams = buildAnalyticsParams(period);
         const previousPeriodParams = buildPreviousAnalyticsParams(period);
+        const trendParams = buildTrendParams(trendRange);
         const [data, previousData, monthlyData, categoryData] = await Promise.all([
           api.getAnalyticsSpending(periodParams),
           previousPeriodParams
             ? api.getAnalyticsSpending(previousPeriodParams)
             : Promise.resolve({ spending_by_category: [] }),
-          api.getMonthlyAnalyticsSpending(periodParams.date_from ? periodParams : FALLBACK_TREND_RANGE),
+          api.getMonthlyAnalyticsSpending(trendParams),
           api.getCategories(),
         ]);
         setAnalytics(data.spending_by_category);
@@ -189,7 +199,7 @@ const Dashboard: React.FC = () => {
         setLoading(false);
       }
     })();
-  }, [period]);
+  }, [period, trendRange]);
 
   const totalSpending = sumSpending(analytics);
   const totalIncome = sumIncome(analytics);
@@ -246,6 +256,33 @@ const Dashboard: React.FC = () => {
   }));
 
   const trendMax = trendPoints.reduce((max, item) => Math.max(max, item.amountMinor), 0);
+  const chartWidth = 680;
+  const chartHeight = 240;
+  const chartPadding = 24;
+  const chartInnerWidth = chartWidth - chartPadding * 2;
+  const chartInnerHeight = chartHeight - chartPadding * 2;
+  const svgTrendPoints = trendPoints.map((point, index) => {
+    const x =
+      trendPoints.length <= 1
+        ? chartWidth / 2
+        : chartPadding + (index / (trendPoints.length - 1)) * chartInnerWidth;
+    const y =
+      trendMax === 0
+        ? chartHeight - chartPadding
+        : chartHeight - chartPadding - (point.amountMinor / trendMax) * chartInnerHeight;
+
+    return {
+      ...point,
+      x,
+      y,
+    };
+  });
+  const linePath = svgTrendPoints
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+    .join(' ');
+  const areaPath = svgTrendPoints.length === 0
+    ? ''
+    : `${linePath} L ${svgTrendPoints[svgTrendPoints.length - 1].x} ${chartHeight - chartPadding} L ${svgTrendPoints[0].x} ${chartHeight - chartPadding} Z`;
   const latestTrendPoint = trendPoints[trendPoints.length - 1];
   const previousTrendPoint = trendPoints[trendPoints.length - 2];
   const trendDeltaMinor =
@@ -581,49 +618,92 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="card-body trend-body">
           <div className="trend-toolbar">
-            <label className="trend-label" htmlFor="dashboard-trend-category">
-              Category
-            </label>
-            <select
-              id="dashboard-trend-category"
-              className="trend-select"
-              value={selectedTrendCategory ?? ''}
-              onChange={(event) => setSelectedTrendCategory(event.target.value || null)}
-              disabled={loading || spendingCategories.length === 0}
-            >
-              {spendingCategories.length === 0 ? (
-                <option value="">No spending categories</option>
-              ) : (
-                spendingCategories.slice(0, 8).map((item) => (
-                  <option key={item.category_key ?? 'uncategorized'} value={item.category_key ?? ''}>
-                    {getCategoryLabel(item.category_key)}
-                  </option>
-                ))
-              )}
-            </select>
+            <div className="trend-control-group">
+              <label className="trend-label" htmlFor="dashboard-trend-category">
+                Category
+              </label>
+              <select
+                id="dashboard-trend-category"
+                className="trend-select"
+                value={selectedTrendCategory ?? ''}
+                onChange={(event) => setSelectedTrendCategory(event.target.value || null)}
+                disabled={loading || spendingCategories.length === 0}
+              >
+                {spendingCategories.length === 0 ? (
+                  <option value="">No spending categories</option>
+                ) : (
+                  spendingCategories.slice(0, 8).map((item) => (
+                    <option key={item.category_key ?? 'uncategorized'} value={item.category_key ?? ''}>
+                      {getCategoryLabel(item.category_key)}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+            <div className="trend-range-selector" aria-label="Select trend range">
+              {TREND_RANGE_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`trend-range-chip ${trendRange === option.key ? 'active' : ''}`}
+                  onClick={() => setTrendRange(option.key)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loading ? (
             <p className="text-center py-8">Loading trend...</p>
-          ) : trendPoints.length === 0 ? (
-            <p className="text-center py-8">Not enough monthly data for this category yet.</p>
+          ) : trendPoints.length < 2 ? (
+            <p className="text-center py-8">Not enough monthly data to draw a trend line yet.</p>
           ) : (
             <>
-              <div className="trend-chart" aria-label="Monthly spending chart">
-                {trendPoints.map((point) => (
-                  <div key={point.monthLabel} className="trend-column">
-                    <div
-                      className="trend-bar"
-                      style={{
-                        height: `${trendMax === 0 ? 0 : Math.max((point.amountMinor / trendMax) * 100, 8)}%`,
-                      }}
-                    />
-                    <span className="trend-month">{point.monthLabel}</span>
-                    <strong className="trend-amount">
-                      {formatAmount(point.amountMinor, point.currency)}
-                    </strong>
-                  </div>
-                ))}
+              <div className="trend-chart trend-line-chart" aria-label="Monthly spending trend line chart">
+                <svg
+                  className="trend-svg"
+                  viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                  role="img"
+                  aria-label={`Monthly spending trend for ${getCategoryLabel(selectedTrendCategory)}`}
+                >
+                  <defs>
+                    <linearGradient id="trendAreaGradient" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#ea580c" stopOpacity="0.32" />
+                      <stop offset="100%" stopColor="#ea580c" stopOpacity="0.03" />
+                    </linearGradient>
+                  </defs>
+                  {[0, 1, 2, 3].map((index) => {
+                    const y = chartPadding + (index / 3) * chartInnerHeight;
+                    return (
+                      <line
+                        key={index}
+                        x1={chartPadding}
+                        x2={chartWidth - chartPadding}
+                        y1={y}
+                        y2={y}
+                        className="trend-grid-line"
+                      />
+                    );
+                  })}
+                  <path d={areaPath} className="trend-area" />
+                  <path d={linePath} className="trend-line" />
+                  {svgTrendPoints.map((point) => (
+                    <g key={`${point.monthLabel}-${point.amountMinor}`}>
+                      <circle cx={point.x} cy={point.y} r="5" className="trend-dot" />
+                    </g>
+                  ))}
+                </svg>
+                <div className="trend-axis">
+                  {trendPoints.map((point) => (
+                    <div key={point.monthLabel} className="trend-axis-item">
+                      <span className="trend-month">{point.monthLabel}</span>
+                      <strong className="trend-amount">
+                        {formatAmount(point.amountMinor, point.currency)}
+                      </strong>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="trend-summary">
@@ -985,9 +1065,15 @@ const Dashboard: React.FC = () => {
         }
         .trend-toolbar {
           display: flex;
-          align-items: center;
+          align-items: end;
           gap: 0.75rem;
           flex-wrap: wrap;
+          justify-content: space-between;
+        }
+        .trend-control-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
         }
         .trend-label {
           font-size: 0.875rem;
@@ -1003,31 +1089,73 @@ const Dashboard: React.FC = () => {
           background: var(--surface-color);
           color: var(--text-main);
         }
+        .trend-range-selector {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+        .trend-range-chip {
+          min-height: 2.5rem;
+          padding: 0.55rem 0.9rem;
+          border-radius: 999px;
+          border: 1px solid var(--border-color);
+          background: var(--surface-color);
+          color: var(--text-main);
+          cursor: pointer;
+          font-size: 0.85rem;
+          font-weight: 600;
+        }
+        .trend-range-chip.active {
+          background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+          border-color: transparent;
+          color: white;
+        }
         .trend-chart {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
-          gap: 0.85rem;
-          align-items: end;
-          min-height: 260px;
           padding: 1rem;
           border-radius: 1rem;
           background:
             linear-gradient(180deg, color-mix(in srgb, var(--primary-color) 8%, transparent), transparent 40%),
             var(--surface-muted);
         }
-        .trend-column {
+        .trend-line-chart {
           display: flex;
           flex-direction: column;
-          justify-content: end;
-          align-items: stretch;
-          gap: 0.5rem;
-          min-height: 228px;
+          gap: 1rem;
         }
-        .trend-bar {
-          min-height: 0;
-          border-radius: 0.9rem 0.9rem 0.35rem 0.35rem;
-          background: linear-gradient(180deg, #f97316 0%, #dc2626 100%);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        .trend-svg {
+          width: 100%;
+          height: auto;
+          overflow: visible;
+        }
+        .trend-grid-line {
+          stroke: color-mix(in srgb, var(--text-muted) 18%, transparent);
+          stroke-width: 1;
+        }
+        .trend-area {
+          fill: url(#trendAreaGradient);
+        }
+        .trend-line {
+          fill: none;
+          stroke: #ea580c;
+          stroke-width: 4;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          filter: drop-shadow(0 6px 18px rgba(234, 88, 12, 0.18));
+        }
+        .trend-dot {
+          fill: white;
+          stroke: #ea580c;
+          stroke-width: 3;
+        }
+        .trend-axis {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+          gap: 0.75rem;
+        }
+        .trend-axis-item {
+          display: flex;
+          flex-direction: column;
+          gap: 0.3rem;
         }
         .trend-month {
           color: var(--text-muted);
@@ -1072,9 +1200,6 @@ const Dashboard: React.FC = () => {
           }
           .comparison-grid {
             grid-template-columns: 1fr;
-          }
-          .trend-chart {
-            grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
           }
           .mover-item {
             flex-direction: column;
