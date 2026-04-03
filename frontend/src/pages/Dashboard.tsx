@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { CalendarRange, LineChart, PieChart, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  CalendarRange,
+  LineChart,
+  PieChart,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import type {
@@ -71,9 +80,83 @@ function buildAnalyticsParams(period: PeriodKey): AnalyticsQueryParams {
   };
 }
 
+function parseIsoDateAtUtc(isoDate: string) {
+  return new Date(`${isoDate}T00:00:00Z`);
+}
+
+function shiftDateByDays(isoDate: string, days: number) {
+  const date = parseIsoDateAtUtc(isoDate);
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatDateInput(date);
+}
+
+function calculateDaySpan(dateFrom: string, dateTo: string) {
+  const from = parseIsoDateAtUtc(dateFrom);
+  const to = parseIsoDateAtUtc(dateTo);
+  const diffMs = to.getTime() - from.getTime();
+  return Math.floor(diffMs / 86_400_000) + 1;
+}
+
+function buildPreviousAnalyticsParams(period: PeriodKey): AnalyticsQueryParams | null {
+  const current = buildAnalyticsParams(period);
+  if (!current.date_from || !current.date_to) {
+    return null;
+  }
+
+  const daySpan = calculateDaySpan(current.date_from, current.date_to);
+  return {
+    date_from: shiftDateByDays(current.date_from, -daySpan),
+    date_to: shiftDateByDays(current.date_to, -daySpan),
+  };
+}
+
+function formatComparisonWindow(params: AnalyticsQueryParams | null) {
+  if (!params?.date_from || !params?.date_to) {
+    return 'No equivalent baseline';
+  }
+
+  const start = parseIsoDateAtUtc(params.date_from).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  const end = parseIsoDateAtUtc(params.date_to).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+
+  return `${start} to ${end}`;
+}
+
+function sumSpending(items: SpendingByCategory[]) {
+  return items.reduce((accumulator, item) => {
+    return item.total_amount_minor < 0
+      ? accumulator + Math.abs(item.total_amount_minor)
+      : accumulator;
+  }, 0);
+}
+
+function sumIncome(items: SpendingByCategory[]) {
+  return items.reduce((accumulator, item) => {
+    return item.total_amount_minor > 0
+      ? accumulator + item.total_amount_minor
+      : accumulator;
+  }, 0);
+}
+
+function formatDeltaPercent(delta: number, baseline: number) {
+  if (baseline <= 0) {
+    return null;
+  }
+
+  return (delta / baseline) * 100;
+}
+
 const Dashboard: React.FC = () => {
   const [period, setPeriod] = useState<PeriodKey>('30d');
   const [analytics, setAnalytics] = useState<SpendingByCategory[]>([]);
+  const [previousAnalytics, setPreviousAnalytics] = useState<SpendingByCategory[]>([]);
   const [monthlyAnalytics, setMonthlyAnalytics] = useState<MonthlySpendingByCategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedTrendCategory, setSelectedTrendCategory] = useState<string | null>(null);
@@ -87,12 +170,17 @@ const Dashboard: React.FC = () => {
 
       try {
         const periodParams = buildAnalyticsParams(period);
-        const [data, monthlyData, categoryData] = await Promise.all([
+        const previousPeriodParams = buildPreviousAnalyticsParams(period);
+        const [data, previousData, monthlyData, categoryData] = await Promise.all([
           api.getAnalyticsSpending(periodParams),
+          previousPeriodParams
+            ? api.getAnalyticsSpending(previousPeriodParams)
+            : Promise.resolve({ spending_by_category: [] }),
           api.getMonthlyAnalyticsSpending(periodParams.date_from ? periodParams : FALLBACK_TREND_RANGE),
           api.getCategories(),
         ]);
         setAnalytics(data.spending_by_category);
+        setPreviousAnalytics(previousData.spending_by_category);
         setMonthlyAnalytics(monthlyData.monthly_spending_by_category);
         setCategories(categoryData);
       } catch (fetchError) {
@@ -103,17 +191,12 @@ const Dashboard: React.FC = () => {
     })();
   }, [period]);
 
-  const totalSpending = analytics.reduce((accumulator, item) => {
-    return item.total_amount_minor < 0
-      ? accumulator + Math.abs(item.total_amount_minor)
-      : accumulator;
-  }, 0);
-
-  const totalIncome = analytics.reduce((accumulator, item) => {
-    return item.total_amount_minor > 0
-      ? accumulator + item.total_amount_minor
-      : accumulator;
-  }, 0);
+  const totalSpending = sumSpending(analytics);
+  const totalIncome = sumIncome(analytics);
+  const previousTotalSpending = sumSpending(previousAnalytics);
+  const previousTotalIncome = sumIncome(previousAnalytics);
+  const totalNet = totalIncome - totalSpending;
+  const previousTotalNet = previousTotalIncome - previousTotalSpending;
 
   const spendingCategories = analytics
     .filter((item) => item.total_amount_minor < 0)
@@ -173,6 +256,55 @@ const Dashboard: React.FC = () => {
     trendDeltaMinor !== null && previousTrendPoint && previousTrendPoint.amountMinor > 0
       ? (trendDeltaMinor / previousTrendPoint.amountMinor) * 100
       : null;
+  const comparisonWindow = formatComparisonWindow(buildPreviousAnalyticsParams(period));
+
+  const totalSpendingDelta = totalSpending - previousTotalSpending;
+  const totalIncomeDelta = totalIncome - previousTotalIncome;
+  const totalNetDelta = totalNet - previousTotalNet;
+  const totalSpendingDeltaPercent = formatDeltaPercent(totalSpendingDelta, previousTotalSpending);
+  const totalIncomeDeltaPercent = formatDeltaPercent(totalIncomeDelta, previousTotalIncome);
+  const totalNetDeltaPercent = formatDeltaPercent(totalNetDelta, Math.abs(previousTotalNet));
+
+  const previousSpendingByCategory = new Map(
+    previousAnalytics
+      .filter((item) => item.total_amount_minor < 0)
+      .map((item) => [item.category_key ?? '__uncategorized__', Math.abs(item.total_amount_minor)]),
+  );
+
+  const spendingMovers = spendingCategories
+    .map((item) => {
+      const key = item.category_key ?? '__uncategorized__';
+      const currentAmount = Math.abs(item.total_amount_minor);
+      const previousAmount = previousSpendingByCategory.get(key) ?? 0;
+      const deltaAmount = currentAmount - previousAmount;
+      return {
+        categoryKey: item.category_key,
+        currentAmount,
+        previousAmount,
+        deltaAmount,
+        deltaPercent: formatDeltaPercent(deltaAmount, previousAmount),
+        currency: item.currency,
+      };
+    })
+    .sort((left, right) => right.deltaAmount - left.deltaAmount);
+
+  const topRisers = spendingMovers.filter((item) => item.deltaAmount > 0).slice(0, 3);
+  const topImprovers = spendingMovers.filter((item) => item.deltaAmount < 0).slice(0, 3);
+
+  const renderDelta = (deltaMinor: number, currency = 'EUR', percentage: number | null = null) => {
+    const isPositive = deltaMinor > 0;
+    const isNeutral = deltaMinor === 0;
+
+    return (
+      <span className={`delta-pill ${isNeutral ? 'flat' : isPositive ? 'up' : 'down'}`}>
+        {isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+        <span>
+          {`${isPositive ? '+' : ''}${formatAmount(deltaMinor, currency)}`}
+          {percentage !== null ? ` (${isPositive ? '+' : ''}${percentage.toFixed(1)}%)` : ''}
+        </span>
+      </span>
+    );
+  };
 
   return (
     <div className="page">
@@ -229,7 +361,7 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="stat-content">
             <span className="stat-label">Net</span>
-            <span className="stat-value">{formatAmount(totalIncome - totalSpending)}</span>
+            <span className="stat-value">{formatAmount(totalNet)}</span>
           </div>
         </div>
         <div className="card stat-card context">
@@ -317,6 +449,121 @@ const Dashboard: React.FC = () => {
                 <div className="insight-row">
                   <span>Largest category</span>
                   <strong>{topCategories[0] ? getCategoryLabel(topCategories[0].category_key) : 'None'}</strong>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="comparison-grid">
+        <div className="card comparison-card">
+          <div className="card-header">
+            <CalendarRange size={20} />
+            <div className="trend-header-copy">
+              <h2>Period comparison</h2>
+              <p>Compare the current window with the previous equivalent period.</p>
+            </div>
+          </div>
+          <div className="card-body comparison-body">
+            <div className="comparison-window">
+              <span>Baseline window</span>
+              <strong>{comparisonWindow}</strong>
+            </div>
+
+            {loading ? (
+              <p className="text-center py-8">Comparing periods...</p>
+            ) : period === 'all' ? (
+              <p className="text-center py-8">Comparison is disabled for all-time view.</p>
+            ) : (
+              <div className="comparison-metrics">
+                <div className="comparison-metric">
+                  <span className="metric-label">Spending</span>
+                  <strong>{formatAmount(totalSpending)}</strong>
+                  {renderDelta(totalSpendingDelta, 'EUR', totalSpendingDeltaPercent)}
+                </div>
+                <div className="comparison-metric">
+                  <span className="metric-label">Income</span>
+                  <strong>{formatAmount(totalIncome)}</strong>
+                  {renderDelta(totalIncomeDelta, 'EUR', totalIncomeDeltaPercent)}
+                </div>
+                <div className="comparison-metric">
+                  <span className="metric-label">Net</span>
+                  <strong>{formatAmount(totalNet)}</strong>
+                  {renderDelta(totalNetDelta, 'EUR', totalNetDeltaPercent)}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="card movers-card">
+          <div className="card-header">
+            <TrendingUp size={20} />
+            <div className="trend-header-copy">
+              <h2>Smart movers</h2>
+              <p>See which categories are accelerating or easing off versus the prior period.</p>
+            </div>
+          </div>
+          <div className="card-body movers-body">
+            {loading ? (
+              <p className="text-center py-8">Analyzing category shifts...</p>
+            ) : period === 'all' ? (
+              <p className="text-center py-8">Switch to a finite period to see category deltas.</p>
+            ) : spendingMovers.length === 0 ? (
+              <p className="text-center py-8">No spending categories to compare.</p>
+            ) : (
+              <>
+                <div className="movers-section">
+                  <div className="movers-title-row">
+                    <h3>Upward pressure</h3>
+                    <span>Categories costing more now</span>
+                  </div>
+                  {topRisers.length === 0 ? (
+                    <p className="text-muted">No category increases detected.</p>
+                  ) : (
+                    <div className="mover-list">
+                      {topRisers.map((item) => (
+                        <div key={`rise-${item.categoryKey ?? 'uncategorized'}`} className="mover-item rise">
+                          <div>
+                            <strong>{getCategoryLabel(item.categoryKey)}</strong>
+                            <div className="mover-meta">
+                              Now {formatAmount(item.currentAmount, item.currency)}
+                              {' · '}
+                              Before {formatAmount(item.previousAmount, item.currency)}
+                            </div>
+                          </div>
+                          {renderDelta(item.deltaAmount, item.currency, item.deltaPercent)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="movers-section">
+                  <div className="movers-title-row">
+                    <h3>Improving categories</h3>
+                    <span>Categories where spending is down</span>
+                  </div>
+                  {topImprovers.length === 0 ? (
+                    <p className="text-muted">No spending reductions detected.</p>
+                  ) : (
+                    <div className="mover-list">
+                      {topImprovers.map((item) => (
+                        <div key={`down-${item.categoryKey ?? 'uncategorized'}`} className="mover-item calm">
+                          <div>
+                            <strong>{getCategoryLabel(item.categoryKey)}</strong>
+                            <div className="mover-meta">
+                              Now {formatAmount(item.currentAmount, item.currency)}
+                              {' · '}
+                              Before {formatAmount(item.previousAmount, item.currency)}
+                            </div>
+                          </div>
+                          {renderDelta(item.deltaAmount, item.currency, item.deltaPercent)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -524,6 +771,11 @@ const Dashboard: React.FC = () => {
           grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
           gap: 1.5rem;
         }
+        .comparison-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.2fr);
+          gap: 1.5rem;
+        }
         .trend-card {
           margin-top: 0;
         }
@@ -552,6 +804,122 @@ const Dashboard: React.FC = () => {
         .trend-header-copy p {
           color: var(--text-muted);
           font-size: 0.875rem;
+        }
+        .comparison-body,
+        .movers-body {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        .comparison-window {
+          display: flex;
+          justify-content: space-between;
+          gap: 1rem;
+          align-items: baseline;
+          padding: 1rem 1.1rem;
+          border-radius: 1rem;
+          background:
+            radial-gradient(circle at top left, color-mix(in srgb, var(--primary-color) 16%, transparent), transparent 36%),
+            var(--surface-muted);
+          border: 1px solid var(--border-color);
+        }
+        .comparison-window span {
+          color: var(--text-muted);
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .comparison-metrics {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 0.9rem;
+        }
+        .comparison-metric {
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+          padding: 1rem;
+          border-radius: 1rem;
+          border: 1px solid var(--border-color);
+          background: var(--surface-color);
+          box-shadow: inset 0 1px 0 color-mix(in srgb, white 12%, transparent);
+        }
+        .metric-label {
+          color: var(--text-muted);
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .delta-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.45rem;
+          width: fit-content;
+          padding: 0.45rem 0.7rem;
+          border-radius: 999px;
+          font-size: 0.78rem;
+          font-weight: 600;
+          border: 1px solid transparent;
+        }
+        .delta-pill.up {
+          background: color-mix(in srgb, var(--danger-bg) 82%, white 18%);
+          color: var(--danger-text);
+          border-color: color-mix(in srgb, var(--danger-border) 72%, transparent);
+        }
+        .delta-pill.down {
+          background: color-mix(in srgb, var(--success-surface) 84%, white 16%);
+          color: var(--success-text);
+          border-color: color-mix(in srgb, var(--success-text) 24%, transparent);
+        }
+        .delta-pill.flat {
+          background: var(--surface-muted);
+          color: var(--text-muted);
+          border-color: var(--border-color);
+        }
+        .movers-section {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .movers-title-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 1rem;
+          align-items: baseline;
+          flex-wrap: wrap;
+        }
+        .movers-title-row h3 {
+          font-size: 0.95rem;
+        }
+        .movers-title-row span,
+        .mover-meta {
+          color: var(--text-muted);
+          font-size: 0.78rem;
+        }
+        .mover-list {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .mover-item {
+          display: flex;
+          justify-content: space-between;
+          gap: 1rem;
+          align-items: center;
+          padding: 1rem;
+          border-radius: 1rem;
+          border: 1px solid var(--border-color);
+          background: var(--surface-muted);
+        }
+        .mover-item.rise {
+          background:
+            linear-gradient(135deg, color-mix(in srgb, var(--danger-bg) 42%, transparent), transparent 50%),
+            var(--surface-muted);
+        }
+        .mover-item.calm {
+          background:
+            linear-gradient(135deg, color-mix(in srgb, var(--success-surface) 42%, transparent), transparent 50%),
+            var(--surface-muted);
         }
         .card-body {
           padding: 1.5rem;
@@ -702,8 +1070,15 @@ const Dashboard: React.FC = () => {
           .dashboard-grid {
             grid-template-columns: 1fr;
           }
+          .comparison-grid {
+            grid-template-columns: 1fr;
+          }
           .trend-chart {
             grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+          }
+          .mover-item {
+            flex-direction: column;
+            align-items: flex-start;
           }
         }
       `}</style>
