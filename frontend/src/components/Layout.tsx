@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Tags, Upload, PieChart } from 'lucide-react';
+import { KeyRound, LayoutDashboard, PieChart, Receipt, Tags, Upload } from 'lucide-react';
+import { useAuth } from '../auth/useAuth';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const { user, logout } = useAuth();
   const location = useLocation();
   const [isMobileChromeHidden, setIsMobileChromeHidden] = React.useState(false);
   const lastScrollYRef = React.useRef(0);
@@ -17,6 +19,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Categorize', path: '/categorize', icon: Tags },
     { name: 'Import', path: '/import', icon: Upload },
     { name: 'Analytics', path: '/analytics', icon: PieChart },
+    { name: 'Account', path: '/account', icon: KeyRound },
   ];
   const currentNavItem = navItems.find((item) => item.path === location.pathname) ?? navItems[0];
 
@@ -74,7 +77,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       <aside className="sidebar">
         <div className="sidebar-header">
-          <h1 className="logo">mony</h1>
+          <div>
+            <h1 className="logo">mony</h1>
+            <p className="sidebar-user">{user?.username}</p>
+          </div>
+          <button className="sidebar-logout" onClick={() => void logout()} type="button">
+            Sign out
+          </button>
         </div>
         <nav className="nav">
           {navItems.map((item) => (

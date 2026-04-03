@@ -6,12 +6,18 @@ const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_PORT: u16 = 3000;
 const DEFAULT_POSTGRES_HOST: &str = "127.0.0.1";
 const DEFAULT_POSTGRES_PORT: u16 = 5432;
+const DEFAULT_AUTH_ISSUER: &str = "mony";
+const DEFAULT_AUTH_AUDIENCE: &str = "mony-api";
+const DEFAULT_ACCESS_TOKEN_TTL_SECONDS: i64 = 600;
+const DEFAULT_REFRESH_TOKEN_TTL_DAYS: i64 = 30;
+const DEFAULT_SECURE_COOKIES: bool = false;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppConfig {
     pub host: String,
     pub port: u16,
     pub database: DatabaseConfig,
+    pub auth: AuthConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,6 +27,17 @@ pub struct DatabaseConfig {
     pub database: String,
     pub user: String,
     pub password: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthConfig {
+    pub issuer: String,
+    pub audience: String,
+    pub jwt_private_key_path: String,
+    pub jwt_public_key_path: String,
+    pub access_token_ttl_seconds: i64,
+    pub refresh_token_ttl_days: i64,
+    pub secure_cookies: bool,
 }
 
 impl AppConfig {
@@ -62,10 +79,41 @@ impl AppConfig {
             })?,
         };
 
+        let auth = AuthConfig {
+            issuer: lookup("MONY_AUTH_ISSUER").unwrap_or_else(|| DEFAULT_AUTH_ISSUER.to_owned()),
+            audience: lookup("MONY_AUTH_AUDIENCE")
+                .unwrap_or_else(|| DEFAULT_AUTH_AUDIENCE.to_owned()),
+            jwt_private_key_path: lookup("MONY_AUTH_JWT_PRIVATE_KEY_PATH").ok_or(
+                ConfigError::MissingEnv {
+                    key: "MONY_AUTH_JWT_PRIVATE_KEY_PATH",
+                },
+            )?,
+            jwt_public_key_path: lookup("MONY_AUTH_JWT_PUBLIC_KEY_PATH").ok_or(
+                ConfigError::MissingEnv {
+                    key: "MONY_AUTH_JWT_PUBLIC_KEY_PATH",
+                },
+            )?,
+            access_token_ttl_seconds: parse_i64_with_default(
+                lookup("MONY_AUTH_ACCESS_TOKEN_TTL_SECONDS"),
+                DEFAULT_ACCESS_TOKEN_TTL_SECONDS,
+                |value, source| ConfigError::InvalidAccessTokenTtl { value, source },
+            )?,
+            refresh_token_ttl_days: parse_i64_with_default(
+                lookup("MONY_AUTH_REFRESH_TOKEN_TTL_DAYS"),
+                DEFAULT_REFRESH_TOKEN_TTL_DAYS,
+                |value, source| ConfigError::InvalidRefreshTokenTtl { value, source },
+            )?,
+            secure_cookies: parse_bool_with_default(
+                lookup("MONY_AUTH_SECURE_COOKIES"),
+                DEFAULT_SECURE_COOKIES,
+            )?,
+        };
+
         Ok(Self {
             host,
             port,
             database,
+            auth,
         })
     }
 }
@@ -84,13 +132,52 @@ pub enum ConfigError {
         #[source]
         source: ParseIntError,
     },
+    #[error("invalid MONY_AUTH_ACCESS_TOKEN_TTL_SECONDS value '{value}': {source}")]
+    InvalidAccessTokenTtl {
+        value: String,
+        #[source]
+        source: ParseIntError,
+    },
+    #[error("invalid MONY_AUTH_REFRESH_TOKEN_TTL_DAYS value '{value}': {source}")]
+    InvalidRefreshTokenTtl {
+        value: String,
+        #[source]
+        source: ParseIntError,
+    },
+    #[error("invalid MONY_AUTH_SECURE_COOKIES value '{0}': expected true or false")]
+    InvalidBoolean(String),
     #[error("missing required environment variable {key}")]
     MissingEnv { key: &'static str },
 }
 
+fn parse_i64_with_default<F>(
+    value: Option<String>,
+    default: i64,
+    map_error: F,
+) -> Result<i64, ConfigError>
+where
+    F: FnOnce(String, ParseIntError) -> ConfigError + Copy,
+{
+    match value {
+        Some(value) => value.parse().map_err(|source| map_error(value, source)),
+        None => Ok(default),
+    }
+}
+
+fn parse_bool_with_default(value: Option<String>, default: bool) -> Result<bool, ConfigError> {
+    match value {
+        Some(value) => match value.as_str() {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err(ConfigError::InvalidBoolean(value)),
+        },
+        None => Ok(default),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{AppConfig, ConfigError, DatabaseConfig};
+    use super::{AppConfig, AuthConfig, ConfigError, DatabaseConfig};
 
     #[test]
     fn defaults_are_applied_when_env_is_missing() {
@@ -98,6 +185,8 @@ mod tests {
             "POSTGRES_DB" => Some("mony".to_owned()),
             "POSTGRES_USER" => Some("mony_app".to_owned()),
             "POSTGRES_PASSWORD" => Some("test-password".to_owned()),
+            "MONY_AUTH_JWT_PRIVATE_KEY_PATH" => Some("/tmp/private.pem".to_owned()),
+            "MONY_AUTH_JWT_PUBLIC_KEY_PATH" => Some("/tmp/public.pem".to_owned()),
             _ => None,
         })
         .expect("config should use defaults");
@@ -114,6 +203,15 @@ mod tests {
                     user: "mony_app".to_owned(),
                     password: "test-password".to_owned(),
                 },
+                auth: AuthConfig {
+                    issuer: "mony".to_owned(),
+                    audience: "mony-api".to_owned(),
+                    jwt_private_key_path: "/tmp/private.pem".to_owned(),
+                    jwt_public_key_path: "/tmp/public.pem".to_owned(),
+                    access_token_ttl_seconds: 600,
+                    refresh_token_ttl_days: 30,
+                    secure_cookies: false,
+                },
             }
         );
     }
@@ -126,6 +224,8 @@ mod tests {
             "POSTGRES_DB" => Some("mony".to_owned()),
             "POSTGRES_USER" => Some("mony_app".to_owned()),
             "POSTGRES_PASSWORD" => Some("test-password".to_owned()),
+            "MONY_AUTH_JWT_PRIVATE_KEY_PATH" => Some("/tmp/private.pem".to_owned()),
+            "MONY_AUTH_JWT_PUBLIC_KEY_PATH" => Some("/tmp/public.pem".to_owned()),
             _ => None,
         })
         .expect_err("invalid MONY_PORT should fail");
@@ -141,6 +241,24 @@ mod tests {
         assert!(matches!(
             error,
             ConfigError::MissingEnv { key: "POSTGRES_DB" }
+        ));
+    }
+
+    #[test]
+    fn auth_key_paths_are_required() {
+        let error = AppConfig::from_lookup(|key| match key {
+            "POSTGRES_DB" => Some("mony".to_owned()),
+            "POSTGRES_USER" => Some("mony_app".to_owned()),
+            "POSTGRES_PASSWORD" => Some("test-password".to_owned()),
+            _ => None,
+        })
+        .expect_err("auth key paths should be required");
+
+        assert!(matches!(
+            error,
+            ConfigError::MissingEnv {
+                key: "MONY_AUTH_JWT_PRIVATE_KEY_PATH"
+            }
         ));
     }
 }

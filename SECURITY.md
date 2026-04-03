@@ -34,3 +34,14 @@ We aim to acknowledge reports within 72 hours and provide a remediation plan or 
 - **Encryption**: Sensitive data should be encrypted at rest and in transit (e.g., using TLS/HTTPS for web-based access).
 - **No Telemetry**: The application does not collect usage data or metrics.
 - **Private Disclosure**: Security reports are handled privately until a fix is available and affected users can upgrade safely.
+
+## Authentication & Authorization Baseline
+
+- **Protected by Default**: Application routes under `/v1/*` should require authentication unless they are explicitly documented as public bootstrap or auth endpoints.
+- **Bootstrap-Only Account Creation**: Public self-service registration is out of scope. Initial user creation should be limited to a one-time bootstrap flow while no account exists.
+- **Password Handling**: Local passwords must be hashed with Argon2id. Plaintext passwords, reversible encryption, and weak password hashing schemes are not acceptable.
+- **Short-Lived Access Tokens**: API access should rely on short-lived asymmetric JWT access tokens with strict validation of `alg`, `iss`, `aud`, `exp`, `nbf`, and `jti`.
+- **Refresh Token Safety**: Refresh tokens should be opaque, random, hashed at rest, rotated on use, and grouped into token families so suspicious reuse can revoke the whole session.
+- **Session Traceability**: Authenticated sessions should be individually identifiable and revocable, with device and audit metadata recorded for sensitive events.
+- **Web Token Storage**: Browser access tokens must stay in memory only. Refresh tokens should be delivered in `HttpOnly`, `Secure` cookies and paired with CSRF protections on refresh/logout endpoints.
+- **Future OIDC Compatibility**: Internal auth boundaries should stay compatible with a later migration to an external OIDC/OAuth2 provider without rewriting application authorization logic.

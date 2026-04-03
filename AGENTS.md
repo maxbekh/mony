@@ -12,12 +12,13 @@ Minimum required workflow:
 4. Use Conventional Commits.
 5. Commit completed logical changes before handover.
 
-## Current Project State (as of 2026-03-29)
+## Current Project State (as of 2026-04-03)
 
 - **Backend (Rust/Axum)**: Core ingestion (CSV), transaction listing/detail/update, analytics, and static category endpoints are operational.
 - **Database (PostgreSQL)**: Initial schema for imports and transactions is migrated.
 - **Frontend**: React/Vite/TypeScript scaffold is present with routing, layout, and typed API client foundations.
 - **Infrastructure**: Docker and Makefile exist with backend and frontend validation commands.
+- **Authentication**: Auth is now an active project slice. The target is a JWT/refresh-token foundation that can evolve toward OIDC/OAuth2 without reworking core authorization boundaries.
 
 ## Roadmap & Next Steps
 
@@ -37,12 +38,23 @@ Agents should pick tasks from this list and **update `TODO.md`** to indicate the
 - **Task 3.1**: Improve `PATCH /v1/transactions/:id` to allow partial updates of metadata.
 - **Task 3.2**: Add pagination and advanced filtering (by date range, amount, category) to `GET /v1/transactions`.
 
+### Phase 4: Authentication & Authorization (ACTIVE)
+- **Task 4.1**: Add auth schema for users, sessions, refresh token families, and auth audit events.
+- **Task 4.2**: Implement bootstrap-only first-user creation and password login with Argon2id.
+- **Task 4.3**: Issue short-lived asymmetric JWT access tokens and publish JWKS metadata.
+- **Task 4.4**: Add opaque rotating refresh tokens with family reuse detection and session revocation.
+- **Task 4.5**: Protect `/v1/*` routes by default, with explicit public auth/bootstrap exceptions and scope-aware extraction hooks.
+- **Task 4.6**: Integrate the web app with login, in-memory access tokens, `HttpOnly` refresh cookies, and CSRF protection on refresh/logout.
+- **Task 4.7**: Add auth-focused tests covering bootstrap, login, refresh, route protection, and revocation behavior.
+
 ## Task Coordination Protocol
 
 1. **CLAIM**: Before starting, check `TODO.md`. If a task is not claimed, add your name next to it: `- [ ] (CLAIMED: @agent_name) Task description`.
 2. **BRANCH**: Create a branch specific to the task: `feat/frontend-scaffold`.
 3. **UPDATE**: Periodically update `TODO.md` with progress if the task is long.
 4. **COMPLETE**: Once done, check the box `- [x] Task description` and remove your claim tag.
+
+Current active auth branch naming convention: `feat/auth-*`.
 
 ## Core Engineering Principles
 
@@ -63,6 +75,7 @@ Agents should pick tasks from this list and **update `TODO.md`** to indicate the
 - **Least Privilege**: Services such as the database user should only have the permissions they need.
 - **Dependency Audit**: Evaluate maintenance status, footprint, and security track record before adding dependencies.
 - **Secure Defaults**: APIs should require authentication by default unless a route is explicitly public.
+- **Auth Architecture Baseline**: Prefer short-lived asymmetric JWT access tokens plus opaque rotating refresh tokens stored server-side. Avoid browser `localStorage` for credentials and keep the design compatible with a future external OIDC provider.
 
 ## Public Repository Data Rules
 

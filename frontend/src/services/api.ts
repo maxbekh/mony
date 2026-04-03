@@ -1,5 +1,8 @@
 import axios from 'axios';
 import type {
+  AuthSessionViewResponse,
+  AuthTokenPairResponse,
+  BootstrapStatusResponse,
   Category,
   Transaction,
   TransactionListResponse,
@@ -17,12 +20,104 @@ const API_URL = import.meta.env.VITE_API_URL ?? '/api';
 
 const client = axios.create({
   baseURL: API_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+let accessToken: string | null = null;
+
+const readCookie = (name: string) => {
+  const cookie = document.cookie
+    .split('; ')
+    .find((entry) => entry.startsWith(`${name}=`));
+
+  return cookie ? decodeURIComponent(cookie.split('=').slice(1).join('=')) : null;
+};
+
+const withCsrfHeader = () => {
+  const csrfToken = readCookie('mony_csrf_token');
+  return csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
+};
+
+client.interceptors.request.use((config) => {
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return config;
+});
+
+export const authTokenStore = {
+  get: () => accessToken,
+  set: (token: string | null) => {
+    accessToken = token;
+  },
+  clear: () => {
+    accessToken = null;
+  },
+};
+
 export const api = {
+  bootstrapStatus: async () => {
+    const { data } = await client.get<BootstrapStatusResponse>('/v1/auth/bootstrap/status');
+    return data;
+  },
+
+  bootstrap: async (username: string, password: string, deviceName: string) => {
+    const { data } = await client.post<AuthTokenPairResponse>('/v1/auth/bootstrap', {
+      username,
+      password,
+      device_name: deviceName,
+    });
+    return data;
+  },
+
+  login: async (username: string, password: string, deviceName: string) => {
+    const { data } = await client.post<AuthTokenPairResponse>('/v1/auth/login', {
+      username,
+      password,
+      device_name: deviceName,
+    });
+    return data;
+  },
+
+  refreshAuth: async () => {
+    const { data } = await client.post<AuthTokenPairResponse>(
+      '/v1/auth/refresh',
+      {},
+      {
+        headers: withCsrfHeader(),
+      },
+    );
+    return data;
+  },
+
+  logout: async () => {
+    const { data } = await client.post<{ message: string }>(
+      '/v1/auth/logout',
+      {},
+      {
+        headers: withCsrfHeader(),
+      },
+    );
+    return data;
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    const { data } = await client.post<{ message: string }>('/v1/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    return data;
+  },
+
+  currentSession: async () => {
+    const { data } = await client.get<AuthSessionViewResponse>('/v1/auth/session');
+    return data;
+  },
+
   health: async () => {
     const { data } = await client.get<StatusPayload>('/health');
     return data;

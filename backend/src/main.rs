@@ -1,8 +1,12 @@
 use std::{env, error::Error};
 
 use mony_backend::{
-    app::build_router, categorization::reapply_category_rules, config::AppConfig,
-    db::connect_and_migrate, state::AppState,
+    app::build_router,
+    auth::{admin_reset_password, AuthState},
+    categorization::reapply_category_rules,
+    config::AppConfig,
+    db::connect_and_migrate,
+    state::AppState,
 };
 use tokio::{net::TcpListener, signal};
 use tracing::info;
@@ -15,8 +19,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let config = AppConfig::from_env()?;
     let pool = connect_and_migrate(&config.database).await?;
+    let auth = AuthState::new(&config.auth)?;
+    let args: Vec<String> = env::args().collect();
 
-    if matches!(env::args().nth(1).as_deref(), Some("recategorize")) {
+    if matches!(args.get(1).map(String::as_str), Some("recategorize")) {
         let summary = reapply_category_rules(&pool).await?;
         info!(
             scanned_transactions = summary.scanned_transactions,
@@ -30,9 +36,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    if matches!(args.get(1).map(String::as_str), Some("reset-password")) {
+        let username = args
+            .get(2)
+            .ok_or("usage: cargo run -p mony-backend -- reset-password <username>")?;
+        let new_password = rpassword::prompt_password("New password: ")?;
+        admin_reset_password(&pool, username, &new_password).await?;
+        info!(%username, "password reset completed");
+        return Ok(());
+    }
+
     let address = config.address();
     let listener = TcpListener::bind(&address).await?;
-    let state = AppState { db: pool };
+    let state = AppState { db: pool, auth };
 
     info!(%address, "starting backend");
 

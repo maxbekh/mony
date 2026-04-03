@@ -1,6 +1,7 @@
 use axum::{
     extract::{Multipart, Path, Query, State},
     http::StatusCode,
+    middleware,
     routing::{delete, get, patch, post},
     Json, Router,
 };
@@ -10,6 +11,10 @@ use tower_http::trace::TraceLayer;
 
 use crate::{
     analytics::{get_spending_by_category, AnalyticsError, AnalyticsParams, AnalyticsResponse},
+    auth::{
+        bootstrap, bootstrap_status, change_password, jwks, list_sessions, login, logout,
+        logout_all, refresh, require_auth, revoke_session_handler, session,
+    },
     categories::{list_categories, Category},
     imports::{
         delete_import, list_imports, DeleteImportResponse, ImportBatchListResponse,
@@ -40,9 +45,7 @@ struct ImportResponse {
 }
 
 pub fn build_router(state: AppState) -> Router {
-    Router::new()
-        .route("/health", get(health))
-        .route("/ready", get(ready))
+    let protected_api = Router::new()
         .route("/v1/imports", post(import_csv).get(get_imports))
         .route("/v1/imports/{id}", delete(delete_import_batch))
         .route("/v1/transactions", get(get_transactions))
@@ -53,6 +56,23 @@ pub fn build_router(state: AppState) -> Router {
             get(get_analytics_spending),
         )
         .route("/v1/categories", get(get_categories))
+        .route("/v1/auth/session", get(session))
+        .route("/v1/auth/logout", post(logout))
+        .route("/v1/auth/logout/all", post(logout_all))
+        .route("/v1/auth/change-password", post(change_password))
+        .route("/v1/auth/sessions", get(list_sessions))
+        .route("/v1/auth/sessions/{id}", delete(revoke_session_handler))
+        .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
+
+    Router::new()
+        .route("/health", get(health))
+        .route("/ready", get(ready))
+        .route("/.well-known/jwks.json", get(jwks))
+        .route("/v1/auth/bootstrap/status", get(bootstrap_status))
+        .route("/v1/auth/bootstrap", post(bootstrap))
+        .route("/v1/auth/login", post(login))
+        .route("/v1/auth/refresh", post(refresh))
+        .merge(protected_api)
         .with_state(state)
         .layer(TraceLayer::new_for_http())
 }
@@ -308,7 +328,7 @@ mod tests {
     use sqlx::postgres::PgPoolOptions;
     use tower::util::ServiceExt;
 
-    use crate::state::AppState;
+    use crate::{auth::test_support, state::AppState};
 
     use super::build_router;
 
@@ -318,7 +338,10 @@ mod tests {
             .connect_lazy(database_url)
             .expect("database url should be valid");
 
-        AppState { db: pool }
+        AppState {
+            db: pool,
+            auth: test_support::auth_state(),
+        }
     }
 
     #[tokio::test]
@@ -372,7 +395,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_transaction_returns_not_found_for_random_id() {
+    async fn protected_routes_require_authentication() {
         let response = build_router(test_state("postgres://mony:mony@127.0.0.1:5432/mony"))
             .oneshot(
                 Request::builder()
@@ -383,12 +406,6 @@ mod tests {
             .await
             .expect("router should respond");
 
-        // Since the database is not actually running, this might return 500 (Internal Server Error)
-        // instead of 404 (Not Found) because the connection fails.
-        // However, if it's connect_lazy, it might only fail when it tries to execute the query.
-        assert!(
-            response.status() == StatusCode::NOT_FOUND
-                || response.status() == StatusCode::INTERNAL_SERVER_ERROR
-        );
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 }

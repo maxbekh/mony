@@ -52,20 +52,32 @@ This file tracks the progress of the **mony** project.
 - [x] Intelligent categorization: derive stronger local rules from normalized descriptions, source metadata, and recurring patterns
 - [ ] Intelligent categorization: learn from confirmed historical categorizations already stored in the database
 - [ ] Intelligent categorization: add optional AI suggestions only for unresolved or low-confidence cases
-- [ ] Prepare authentication-friendly boundaries without implementing auth yet
+- [x] Implement auth foundation: bootstrap admin, JWT access tokens, refresh token rotation, session audit, and protected web/API flows
+
+## Phase 4: Authentication & Authorization
+
+- [x] **(Task 4.1)** Add auth schema: users, sessions, refresh token families, and auth audit events
+- [x] **(Task 4.2)** Implement bootstrap-only first user creation and password login with Argon2id
+- [x] **(Task 4.3)** Issue asymmetric JWT access tokens with strict claim validation and JWKS publishing
+- [x] **(Task 4.4)** Implement opaque refresh tokens with hashing, rotation, family theft detection, and session revocation
+- [x] **(Task 4.5)** Protect `/v1/*` routes by default and introduce scope-aware auth extractors/middleware
+- [x] **(Task 4.6)** Integrate the React web app with login, token refresh, route protection, and secure token storage rules
+- [x] **(Task 4.7)** Add backend and frontend validation coverage for auth flows and protected route behavior
 
 ## Notes For Upcoming Work
 
 - New data management features should preserve financial integrity and avoid hidden rewrites.
-- Authentication remains deferred, but route and state design should stay compatible with future protection and scoping.
+- Authentication now targets an OAuth2/OIDC-compatible foundation with short-lived asymmetric JWT access tokens and opaque rotating refresh tokens.
+- Web auth should keep access tokens in memory only and use `HttpOnly` refresh cookies with CSRF protections for refresh and logout flows.
 - Categorization work should start by mining the existing database for bad tags and repeated merchant patterns before introducing new external systems.
 - AI should be a last-layer suggestion mechanism, not the primary categorization source.
 - Learned categorization memory derived from a real local database must remain unversioned and outside the public repository.
 
 ## Immediate Next Objectives
 
+- Harden auth beyond the foundation: rate limiting, MFA, and explicit OIDC provider integration planning.
+- Add finer-grained scope assignment and future user/workspace authorization boundaries.
 - Build a local-only categorization memory layer that learns from confirmed edits without storing personal patterns in the public repository.
-- Define and implement auth-friendly backend boundaries next: route grouping, middleware insertion points, and future user/workspace scoping hooks.
 - Run a short real-device polish pass on the new mobile experience and tighten any remaining spacing, safe-area, and Safari icon quirks.
 
 ## Infrastructure & DX

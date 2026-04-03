@@ -109,25 +109,119 @@ Any example dataset or fixture added to the repository must be synthetic or irre
 - `docker-compose.yml`: Local PostgreSQL bootstrap.
 - `Cargo.toml`: Workspace root for Rust tooling.
 
-## Local Bootstrap
+## Run From Scratch
 
-1. Copy `.env.example` to `.env`.
-2. Replace `POSTGRES_PASSWORD` with a long random password.
-3. Install Rust 1.88 or newer with `rustup` if it is not already available.
-4. Validate the project with `make check`.
-5. Start PostgreSQL with `make up-db`.
-6. Run the backend with `make run-backend`.
+### Prerequisites
+
+- Git
+- Docker Engine with Compose support
+- Rust 1.88+ via `rustup` if you want to run the backend outside Docker
+- Node.js 22+ if you want to run the frontend outside Docker
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/maxbekh/mony.git
+cd mony
+```
+
+### 2. Create local configuration
+
+```bash
+cp .env.example .env
+mkdir -p .local/keys
+openssl genrsa -out .local/keys/mony-jwt-private.pem 2048
+openssl rsa -in .local/keys/mony-jwt-private.pem -pubout -out .local/keys/mony-jwt-public.pem
+```
+
+Then edit `.env` and at minimum replace:
+
+- `POSTGRES_PASSWORD`
+- `MONY_AUTH_SECURE_COOKIES`
+  - keep `false` for local HTTP development
+  - switch to `true` behind HTTPS in production
+
+The default `.env.example` already points to host-local key paths:
+
+- `.local/keys/mony-jwt-private.pem`
+- `.local/keys/mony-jwt-public.pem`
+
+When running in Docker Compose, the backend container overrides those paths internally and reads the same files through `/run/secrets`.
+
+### 3. Start the full stack with Docker Compose
+
+```bash
+docker compose --env-file .env up --build -d
+```
+
+Then open:
+
+- frontend: `http://localhost/`
+- health: `http://localhost/health`
+- readiness: `http://localhost/ready`
+- JWKS: `http://localhost/.well-known/jwks.json`
+
+On first launch, browse to the web app and create the initial administrator account through the bootstrap login screen. Public registration is disabled after that first account exists.
+
+After sign-in, password changes are available from the `Account` page in the web app.
+
+### 4. Stop the stack
+
+```bash
+docker compose --env-file .env down
+```
+
+To also remove PostgreSQL data:
+
+```bash
+docker compose --env-file .env down -v
+```
+
+### Optional local development without Docker for app processes
+
+You can still use Docker only for PostgreSQL and run the backend/frontend directly on the host.
+
+1. Start PostgreSQL:
+
+```bash
+make up-db
+```
+
+2. Run the backend:
+
+```bash
+make run-backend
+```
+
+3. Run the frontend in another shell:
+
+```bash
+npm install --prefix frontend
+npm run dev --prefix frontend
+```
+
+### Admin password reset
+
+If you have shell access to the backend host and need to recover an account without the current password:
+
+```bash
+cargo run -p mony-backend -- reset-password <username>
+```
+
+The command prompts for a new password, updates the stored Argon2id hash, and revokes all existing sessions for that user.
+
+### Validation
+
+To validate the repository locally:
+
+```bash
+make check
+```
 
 The compose file now requires explicit environment variables to avoid accidental insecure defaults.
 
 ## Self-Hosting with Docker Compose
 
 For a containerized deployment path, use the Docker Compose stack documented in [docs/self-hosting.md](./docs/self-hosting.md).
-
-Quick start:
-
-1. Copy `.env.example` to `.env`.
-2. Replace `POSTGRES_PASSWORD`.
-3. Run `docker compose --env-file .env up --build -d`.
 
 The frontend is exposed on `http://localhost/` and proxies API requests to the backend internally.
