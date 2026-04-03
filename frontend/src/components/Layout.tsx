@@ -12,6 +12,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const [isMobileChromeHidden, setIsMobileChromeHidden] = React.useState(false);
   const lastScrollYRef = React.useRef(0);
+  const appVersionLabel = `${__APP_VERSION__} (${__APP_BUILD__})`;
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -71,6 +72,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <span className="mobile-logo">mony</span>
           <div className="mobile-header-copy">
             <strong>{currentNavItem.name}</strong>
+            <span>{appVersionLabel}</span>
           </div>
         </div>
       </header>
@@ -80,6 +82,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div>
             <h1 className="logo">mony</h1>
             <p className="sidebar-user">{user?.username}</p>
+            <p className="sidebar-version">{appVersionLabel}</p>
           </div>
           <button className="sidebar-logout" onClick={() => void logout()} type="button">
             Sign out

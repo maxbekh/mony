@@ -11,6 +11,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { FinanceTrendChart } from '../components/FinanceTrendChart';
 import { api } from '../services/api';
 import type {
   AnalyticsQueryParams,
@@ -246,52 +247,25 @@ const Dashboard: React.FC = () => {
     .sort((left, right) => left.month_start.localeCompare(right.month_start));
 
   const trendPoints = selectedTrendSeries.map((item) => ({
+    id: item.month_start,
     monthLabel: new Date(`${item.month_start}T00:00:00Z`).toLocaleDateString('en-US', {
       month: 'short',
       year: '2-digit',
       timeZone: 'UTC',
     }),
-    amountMinor: Math.abs(item.total_amount_minor),
+    valueMinor: Math.abs(item.total_amount_minor),
     currency: item.currency,
   }));
 
-  const trendMax = trendPoints.reduce((max, item) => Math.max(max, item.amountMinor), 0);
-  const chartWidth = 680;
-  const chartHeight = 240;
-  const chartPadding = 24;
-  const chartInnerWidth = chartWidth - chartPadding * 2;
-  const chartInnerHeight = chartHeight - chartPadding * 2;
-  const svgTrendPoints = trendPoints.map((point, index) => {
-    const x =
-      trendPoints.length <= 1
-        ? chartWidth / 2
-        : chartPadding + (index / (trendPoints.length - 1)) * chartInnerWidth;
-    const y =
-      trendMax === 0
-        ? chartHeight - chartPadding
-        : chartHeight - chartPadding - (point.amountMinor / trendMax) * chartInnerHeight;
-
-    return {
-      ...point,
-      x,
-      y,
-    };
-  });
-  const linePath = svgTrendPoints
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-    .join(' ');
-  const areaPath = svgTrendPoints.length === 0
-    ? ''
-    : `${linePath} L ${svgTrendPoints[svgTrendPoints.length - 1].x} ${chartHeight - chartPadding} L ${svgTrendPoints[0].x} ${chartHeight - chartPadding} Z`;
   const latestTrendPoint = trendPoints[trendPoints.length - 1];
   const previousTrendPoint = trendPoints[trendPoints.length - 2];
   const trendDeltaMinor =
     latestTrendPoint && previousTrendPoint
-      ? latestTrendPoint.amountMinor - previousTrendPoint.amountMinor
+      ? latestTrendPoint.valueMinor - previousTrendPoint.valueMinor
       : null;
   const trendDeltaPercent =
-    trendDeltaMinor !== null && previousTrendPoint && previousTrendPoint.amountMinor > 0
-      ? (trendDeltaMinor / previousTrendPoint.amountMinor) * 100
+    trendDeltaMinor !== null && previousTrendPoint && previousTrendPoint.valueMinor > 0
+      ? (trendDeltaMinor / previousTrendPoint.valueMinor) * 100
       : null;
   const comparisonWindow = formatComparisonWindow(buildPreviousAnalyticsParams(period));
 
@@ -660,58 +634,24 @@ const Dashboard: React.FC = () => {
             <p className="text-center py-8">Not enough monthly data to draw a trend line yet.</p>
           ) : (
             <>
-              <div className="trend-chart trend-line-chart" aria-label="Monthly spending trend line chart">
-                <svg
-                  className="trend-svg"
-                  viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                  role="img"
-                  aria-label={`Monthly spending trend for ${getCategoryLabel(selectedTrendCategory)}`}
-                >
-                  <defs>
-                    <linearGradient id="trendAreaGradient" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#ea580c" stopOpacity="0.32" />
-                      <stop offset="100%" stopColor="#ea580c" stopOpacity="0.03" />
-                    </linearGradient>
-                  </defs>
-                  {[0, 1, 2, 3].map((index) => {
-                    const y = chartPadding + (index / 3) * chartInnerHeight;
-                    return (
-                      <line
-                        key={index}
-                        x1={chartPadding}
-                        x2={chartWidth - chartPadding}
-                        y1={y}
-                        y2={y}
-                        className="trend-grid-line"
-                      />
-                    );
-                  })}
-                  <path d={areaPath} className="trend-area" />
-                  <path d={linePath} className="trend-line" />
-                  {svgTrendPoints.map((point) => (
-                    <g key={`${point.monthLabel}-${point.amountMinor}`}>
-                      <circle cx={point.x} cy={point.y} r="5" className="trend-dot" />
-                    </g>
-                  ))}
-                </svg>
-                <div className="trend-axis">
-                  {trendPoints.map((point) => (
-                    <div key={point.monthLabel} className="trend-axis-item">
-                      <span className="trend-month">{point.monthLabel}</span>
-                      <strong className="trend-amount">
-                        {formatAmount(point.amountMinor, point.currency)}
-                      </strong>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <FinanceTrendChart
+                points={trendPoints.map((point) => ({
+                  id: point.id,
+                  label: point.monthLabel,
+                  valueMinor: point.valueMinor,
+                  currency: point.currency,
+                }))}
+                ariaLabel={`Monthly spending trend for ${getCategoryLabel(selectedTrendCategory)}`}
+                formatAmount={formatAmount}
+                theme="orange"
+              />
 
               <div className="trend-summary">
                 <div className="trend-summary-item">
                   <span>Latest month</span>
                   <strong>
                     {latestTrendPoint
-                      ? formatAmount(latestTrendPoint.amountMinor, latestTrendPoint.currency)
+                      ? formatAmount(latestTrendPoint.valueMinor, latestTrendPoint.currency)
                       : 'N/A'}
                   </strong>
                 </div>
@@ -719,7 +659,7 @@ const Dashboard: React.FC = () => {
                   <span>Previous month</span>
                   <strong>
                     {previousTrendPoint
-                      ? formatAmount(previousTrendPoint.amountMinor, previousTrendPoint.currency)
+                      ? formatAmount(previousTrendPoint.valueMinor, previousTrendPoint.currency)
                       : 'N/A'}
                   </strong>
                 </div>

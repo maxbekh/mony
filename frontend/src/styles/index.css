@@ -123,6 +123,13 @@ textarea {
   margin-top: 0.2rem;
 }
 
+.sidebar-version {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  margin-top: 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+}
+
 .sidebar-logout {
   border: 1px solid var(--border-color);
   background: var(--surface-color);

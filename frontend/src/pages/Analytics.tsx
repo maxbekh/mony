@@ -10,6 +10,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
+import { FinanceTrendChart } from '../components/FinanceTrendChart';
 import { api } from '../services/api';
 import type { Category, MonthlySpendingByCategory, SpendingByCategory } from '../types';
 
@@ -136,34 +137,6 @@ const Analytics: React.FC = () => {
       timeZone: 'UTC',
     }),
   }));
-  const trendMax = trendRows.reduce((max, row) => Math.max(max, row.absolute_amount_minor), 0);
-  const chartWidth = 760;
-  const chartHeight = 260;
-  const chartPadding = 28;
-  const chartInnerWidth = chartWidth - chartPadding * 2;
-  const chartInnerHeight = chartHeight - chartPadding * 2;
-  const svgTrendPoints = trendRows.map((row, index) => {
-    const x =
-      trendRows.length <= 1
-        ? chartWidth / 2
-        : chartPadding + (index / (trendRows.length - 1)) * chartInnerWidth;
-    const y =
-      trendMax === 0
-        ? chartHeight - chartPadding
-        : chartHeight - chartPadding - (row.absolute_amount_minor / trendMax) * chartInnerHeight;
-
-    return {
-      ...row,
-      x,
-      y,
-    };
-  });
-  const linePath = svgTrendPoints
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
-    .join(' ');
-  const areaPath = svgTrendPoints.length === 0
-    ? ''
-    : `${linePath} L ${svgTrendPoints[svgTrendPoints.length - 1].x} ${chartHeight - chartPadding} L ${svgTrendPoints[0].x} ${chartHeight - chartPadding} Z`;
   const trendLatest = trendRows[trendRows.length - 1];
   const trendPrevious = trendRows[trendRows.length - 2];
   const rollingAverage =
@@ -504,53 +477,17 @@ const Analytics: React.FC = () => {
             <p className="empty">Not enough monthly data to render a curve for this category.</p>
           ) : (
             <>
-              <div className="trend-chart trend-line-chart">
-                <svg
-                  className="trend-svg"
-                  viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                  role="img"
-                  aria-label={`Monthly spending trend for ${getCategoryLabel(selectedCategory)}`}
-                >
-                  <defs>
-                    <linearGradient id="analyticsTrendAreaGradient" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#0f766e" stopOpacity="0.24" />
-                      <stop offset="100%" stopColor="#0f766e" stopOpacity="0.03" />
-                    </linearGradient>
-                    <linearGradient id="analyticsTrendLineGradient" x1="0" x2="1" y1="0" y2="0">
-                      <stop offset="0%" stopColor="#14b8a6" />
-                      <stop offset="100%" stopColor="#0f766e" />
-                    </linearGradient>
-                  </defs>
-                  {[0, 1, 2, 3].map((index) => {
-                    const y = chartPadding + (index / 3) * chartInnerHeight;
-                    return (
-                      <line
-                        key={index}
-                        x1={chartPadding}
-                        x2={chartWidth - chartPadding}
-                        y1={y}
-                        y2={y}
-                        className="trend-grid-line"
-                      />
-                    );
-                  })}
-                  <path d={areaPath} className="trend-area" />
-                  <path d={linePath} className="trend-line" />
-                  {svgTrendPoints.map((point) => (
-                    <g key={`${point.month_start}-${point.category_key ?? 'uncategorized'}`}>
-                      <circle cx={point.x} cy={point.y} r="5" className="trend-dot" />
-                    </g>
-                  ))}
-                </svg>
-                <div className="trend-axis">
-                  {trendRows.map((row) => (
-                    <div key={`${row.month_start}-${row.category_key ?? 'uncategorized'}`} className="trend-axis-item">
-                      <span>{row.label}</span>
-                      <strong>{formatAmount(row.absolute_amount_minor, row.currency)}</strong>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <FinanceTrendChart
+                points={trendRows.map((row) => ({
+                  id: row.month_start,
+                  label: row.label,
+                  valueMinor: row.absolute_amount_minor,
+                  currency: row.currency,
+                }))}
+                ariaLabel={`Monthly spending trend for ${getCategoryLabel(selectedCategory)}`}
+                formatAmount={formatAmount}
+                theme="teal"
+              />
 
               <div className="trend-insights">
                 <div className="trend-insight-card">
