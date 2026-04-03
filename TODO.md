@@ -62,6 +62,12 @@ This file tracks the progress of the **mony** project.
 - AI should be a last-layer suggestion mechanism, not the primary categorization source.
 - Learned categorization memory derived from a real local database must remain unversioned and outside the public repository.
 
+## Immediate Next Objectives
+
+- Build a local-only categorization memory layer that learns from confirmed edits without storing personal patterns in the public repository.
+- Define and implement auth-friendly backend boundaries next: route grouping, middleware insertion points, and future user/workspace scoping hooks.
+- Run a short real-device polish pass on the new mobile experience and tighten any remaining spacing, safe-area, and Safari icon quirks.
+
 ## Infrastructure & DX
 
 - [x] Makefile improvements (build, lint, test)
