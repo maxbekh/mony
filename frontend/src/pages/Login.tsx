@@ -46,13 +46,8 @@ export default function Login() {
     <div className="auth-shell">
       <div className="auth-card">
         <div className="auth-card-header">
-          <span className="auth-eyebrow">Security-first access</span>
-          <h1>{bootstrapRequired ? 'Initialize mony' : 'Sign in to mony'}</h1>
-          <p>
-            {bootstrapRequired
-              ? 'Create the first administrator account. This bootstrap flow is disabled after the first account exists.'
-              : 'Use your local mony username. Access tokens stay in memory and refresh uses secure cookies.'}
-          </p>
+          <span className="auth-mark">mony</span>
+          <h1>Sign in</h1>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -68,11 +63,6 @@ export default function Login() {
               placeholder={bootstrapRequired ? 'owner' : 'Enter your username'}
               required
             />
-            {bootstrapRequired ? (
-              <p className="auth-hint">
-                Lowercase letters, numbers, `.`, `_`, `-`, and `@` are accepted.
-              </p>
-            ) : null}
           </label>
 
           <label className="auth-field">

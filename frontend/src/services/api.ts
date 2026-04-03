@@ -105,6 +105,14 @@ export const api = {
     return data;
   },
 
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    const { data } = await client.post<{ message: string }>('/v1/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    });
+    return data;
+  },
+
   currentSession: async () => {
     const { data } = await client.get<AuthSessionViewResponse>('/v1/auth/session');
     return data;

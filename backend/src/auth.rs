@@ -277,6 +277,12 @@ pub struct LoginRequest {
     pub device_name: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct AuthUserResponse {
     pub id: String,
@@ -666,6 +672,57 @@ pub async fn logout_all(
     ))
 }
 
+pub async fn change_password(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Json(payload): Json<ChangePasswordRequest>,
+) -> Result<(HeaderMap, Json<LogoutResponse>), AuthError> {
+    validate_password(&payload.new_password)?;
+    if payload.current_password == payload.new_password {
+        return Err(AuthError::BadRequest(
+            "new password must be different from the current password".to_string(),
+        ));
+    }
+
+    let mut tx = state
+        .db
+        .begin()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+    let user = find_user_by_id(&mut tx, auth.user_id).await?;
+
+    verify_password(&payload.current_password, &user.password_hash)
+        .map_err(|_| AuthError::Unauthorized("invalid current password".to_string()))?;
+
+    let password_hash = hash_password(&payload.new_password)?;
+    sqlx::query("UPDATE auth_user SET password_hash = $1, updated_at = NOW() WHERE id = $2")
+        .bind(password_hash)
+        .bind(auth.user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+    revoke_all_sessions_for_user(&mut tx, auth.user_id).await?;
+    log_auth_event(
+        &mut tx,
+        Some(auth.user_id),
+        Some(auth.session_id),
+        "password_changed",
+        None,
+        json!({}),
+    )
+    .await?;
+    tx.commit()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    Ok((
+        clear_auth_cookie_headers(state.auth.secure_cookies),
+        Json(LogoutResponse {
+            message: "password updated; sign in again",
+        }),
+    ))
+}
+
 pub async fn session(auth: AuthenticatedUser) -> Json<AuthSessionViewResponse> {
     Json(AuthSessionViewResponse {
         user: AuthUserResponse {
@@ -768,6 +825,19 @@ async fn count_users(pool: &PgPool) -> Result<i64, AuthError> {
         .fetch_one(pool)
         .await
         .map_err(|error| AuthError::Internal(error.to_string()))
+}
+
+async fn find_user_by_id(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: Uuid,
+) -> Result<UserRecord, AuthError> {
+    sqlx::query_as::<_, UserRecord>(
+        "SELECT id, username, password_hash FROM auth_user WHERE id = $1",
+    )
+    .bind(user_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))
 }
 
 async fn create_session(
@@ -947,6 +1017,20 @@ async fn revoke_session_inner(
     Ok(())
 }
 
+async fn revoke_all_sessions_for_user(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: Uuid,
+) -> Result<(), AuthError> {
+    sqlx::query(
+        "UPDATE auth_session SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL",
+    )
+    .bind(user_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))?;
+    Ok(())
+}
+
 async fn log_auth_event(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     user_id: Option<Uuid>,
@@ -993,10 +1077,14 @@ fn normalize_username(input: &str) -> Result<String, AuthError> {
 }
 
 fn validate_password(password: &str) -> Result<(), AuthError> {
-    if password.trim().len() < 12 {
+    let length = password.chars().count();
+    if length < 12 {
         return Err(AuthError::BadRequest(
             "password must be at least 12 characters long".to_string(),
         ));
+    }
+    if length > 1024 {
+        return Err(AuthError::BadRequest("password is too long".to_string()));
     }
     Ok(())
 }
@@ -1006,6 +1094,49 @@ fn hash_password(password: &str) -> Result<String, AuthError> {
     Argon2::default()
         .hash_password(password.as_bytes(), &salt)
         .map(|hash| hash.to_string())
+        .map_err(|error| AuthError::Internal(error.to_string()))
+}
+
+pub async fn admin_reset_password(
+    pool: &PgPool,
+    username: &str,
+    new_password: &str,
+) -> Result<(), AuthError> {
+    let username = normalize_username(username)?;
+    validate_password(new_password)?;
+
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+    let user = sqlx::query_as::<_, UserRecord>(
+        "SELECT id, username, password_hash FROM auth_user WHERE username = $1",
+    )
+    .bind(&username)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))?
+    .ok_or_else(|| AuthError::BadRequest("user not found".to_string()))?;
+
+    let password_hash = hash_password(new_password)?;
+    sqlx::query("UPDATE auth_user SET password_hash = $1, updated_at = NOW() WHERE id = $2")
+        .bind(password_hash)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+    revoke_all_sessions_for_user(&mut tx, user.id).await?;
+    log_auth_event(
+        &mut tx,
+        Some(user.id),
+        None,
+        "password_reset_admin",
+        None,
+        json!({ "username": user.username }),
+    )
+    .await?;
+    tx.commit()
+        .await
         .map_err(|error| AuthError::Internal(error.to_string()))
 }
 
@@ -1037,14 +1168,15 @@ fn key_id(public_key_pem: &[u8]) -> String {
 
 fn request_context(headers: &HeaderMap, device_name: Option<String>) -> RequestContext {
     RequestContext {
-        device_name: device_name
-            .map(|value| value.trim().to_owned())
-            .filter(|value| !value.is_empty()),
+        device_name: sanitize_optional_text(device_name, 120),
         ip_address: request_ip_address(headers),
-        user_agent: headers
-            .get(header::USER_AGENT)
-            .and_then(|value| value.to_str().ok())
-            .map(ToOwned::to_owned),
+        user_agent: sanitize_optional_text(
+            headers
+                .get(header::USER_AGENT)
+                .and_then(|value| value.to_str().ok())
+                .map(ToOwned::to_owned),
+            512,
+        ),
     }
 }
 
@@ -1056,6 +1188,20 @@ fn request_ip_address(headers: &HeaderMap) -> Option<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
+        .and_then(|value| sanitize_optional_text(Some(value), 128))
+}
+
+fn sanitize_optional_text(input: Option<String>, max_length: usize) -> Option<String> {
+    input
+        .map(|value| {
+            value
+                .trim()
+                .chars()
+                .filter(|character| !character.is_control())
+                .take(max_length)
+                .collect::<String>()
+        })
+        .filter(|value| !value.is_empty())
 }
 
 fn extract_bearer(headers: &HeaderMap) -> Result<&str, AuthError> {
@@ -1206,7 +1352,7 @@ pub(crate) mod test_support {
 mod tests {
     use super::{
         append_cookie_header, clear_auth_cookie_headers, extract_cookie, hash_token, key_id,
-        require_csrf,
+        normalize_username, require_csrf, validate_password,
     };
     use axum::{
         body::Body,
@@ -1283,6 +1429,27 @@ mod tests {
             key_id(public_key_pem.as_bytes()),
             key_id(public_key_pem.as_bytes())
         );
+    }
+
+    #[test]
+    fn usernames_are_normalized_to_trimmed_lowercase() {
+        assert_eq!(
+            normalize_username("  Owner.Admin  ").expect("username should normalize"),
+            "owner.admin"
+        );
+    }
+
+    #[test]
+    fn invalid_usernames_are_rejected() {
+        assert!(normalize_username("ab").is_err());
+        assert!(normalize_username("owner admin").is_err());
+    }
+
+    #[test]
+    fn password_validation_rejects_short_and_huge_values() {
+        assert!(validate_password("short").is_err());
+        assert!(validate_password(&"a".repeat(1025)).is_err());
+        assert!(validate_password("correct horse battery staple").is_ok());
     }
 
     #[tokio::test]

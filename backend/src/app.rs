@@ -12,8 +12,8 @@ use tower_http::trace::TraceLayer;
 use crate::{
     analytics::{get_spending_by_category, AnalyticsError, AnalyticsParams, AnalyticsResponse},
     auth::{
-        bootstrap, bootstrap_status, jwks, list_sessions, login, logout, logout_all, refresh,
-        require_auth, revoke_session_handler, session,
+        bootstrap, bootstrap_status, change_password, jwks, list_sessions, login, logout,
+        logout_all, refresh, require_auth, revoke_session_handler, session,
     },
     categories::{list_categories, Category},
     imports::{
@@ -59,6 +59,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/auth/session", get(session))
         .route("/v1/auth/logout", post(logout))
         .route("/v1/auth/logout/all", post(logout_all))
+        .route("/v1/auth/change-password", post(change_password))
         .route("/v1/auth/sessions", get(list_sessions))
         .route("/v1/auth/sessions/{id}", delete(revoke_session_handler))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));

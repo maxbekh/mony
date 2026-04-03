@@ -3,6 +3,7 @@ import { AuthProvider } from './auth/AuthProvider';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { Layout } from './components/Layout';
 import Login from './pages/Login';
+import Account from './pages/Account';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import Categorize from './pages/Categorize';
@@ -27,6 +28,7 @@ function App() {
                     <Route path="/categorize" element={<Categorize />} />
                     <Route path="/import" element={<Import />} />
                     <Route path="/analytics" element={<Analytics />} />
+                    <Route path="/account" element={<Account />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>

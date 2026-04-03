@@ -163,6 +163,8 @@ Then open:
 
 On first launch, browse to the web app and create the initial administrator account through the bootstrap login screen. Public registration is disabled after that first account exists.
 
+After sign-in, password changes are available from the `Account` page in the web app.
+
 ### 4. Stop the stack
 
 ```bash
@@ -197,6 +199,16 @@ make run-backend
 npm install --prefix frontend
 npm run dev --prefix frontend
 ```
+
+### Admin password reset
+
+If you have shell access to the backend host and need to recover an account without the current password:
+
+```bash
+cargo run -p mony-backend -- reset-password <username>
+```
+
+The command prompts for a new password, updates the stored Argon2id hash, and revokes all existing sessions for that user.
 
 ### Validation
 

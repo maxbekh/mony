@@ -262,14 +262,20 @@ body {
   margin-bottom: 1.5rem;
 }
 
-.auth-eyebrow {
+.auth-mark {
   display: inline-flex;
-  padding: 0.3rem 0.65rem;
-  border-radius: 999px;
-  background: #dbeafe;
+  align-items: center;
+  justify-content: center;
+  min-width: 4rem;
+  height: 2.75rem;
+  padding: 0 0.85rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
   color: var(--primary-color);
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-transform: lowercase;
   margin-bottom: 0.9rem;
 }
 
@@ -281,6 +287,48 @@ body {
 
 .auth-card p {
   color: var(--text-muted);
+}
+
+.settings-panel {
+  max-width: 540px;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-eyebrow {
+  display: inline-flex;
+  margin-bottom: 0.5rem;
+  color: var(--primary-color);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.settings-header h1 {
+  font-size: 1.9rem;
+  line-height: 1.05;
+  margin-bottom: 0.25rem;
+}
+
+.settings-header p {
+  color: var(--text-muted);
+}
+
+.settings-form {
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 1.25rem;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.06);
 }
 
 .auth-form {

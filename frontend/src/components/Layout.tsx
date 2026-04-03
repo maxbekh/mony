@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Tags, Upload, PieChart } from 'lucide-react';
+import { KeyRound, LayoutDashboard, PieChart, Receipt, Tags, Upload } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 
 interface LayoutProps {
@@ -19,6 +19,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Categorize', path: '/categorize', icon: Tags },
     { name: 'Import', path: '/import', icon: Upload },
     { name: 'Analytics', path: '/analytics', icon: PieChart },
+    { name: 'Account', path: '/account', icon: KeyRound },
   ];
   const currentNavItem = navItems.find((item) => item.path === location.pathname) ?? navItems[0];
 
