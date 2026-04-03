@@ -8,6 +8,8 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const [isMobileChromeHidden, setIsMobileChromeHidden] = React.useState(false);
+  const lastScrollYRef = React.useRef(0);
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -18,9 +20,46 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   ];
   const currentNavItem = navItems.find((item) => item.path === location.pathname) ?? navItems[0];
 
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerWidth > 768) {
+        setIsMobileChromeHidden(false);
+        return;
+      }
+
+      const currentScrollY = window.scrollY;
+      const previousScrollY = lastScrollYRef.current;
+      const isScrollingDown = currentScrollY > previousScrollY;
+      const passedThreshold = currentScrollY > 24;
+      const scrollDelta = Math.abs(currentScrollY - previousScrollY);
+
+      if (scrollDelta < 8) {
+        return;
+      }
+
+      setIsMobileChromeHidden(isScrollingDown && passedThreshold);
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    const handleResize = () => {
+      if (window.innerWidth > 768) {
+        setIsMobileChromeHidden(false);
+      }
+    };
+
+    lastScrollYRef.current = window.scrollY;
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   return (
     <div className="layout">
-      <header className="mobile-header">
+      <header className={`mobile-header ${isMobileChromeHidden ? 'hidden' : ''}`}>
         <div className="mobile-brand">
           <span className="mobile-logo">mony</span>
           <div className="mobile-header-copy">
@@ -50,7 +89,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       <main className="main-content">{children}</main>
 
-      <nav className="mobile-tabbar" aria-label="Primary">
+      <nav
+        className={`mobile-tabbar ${isMobileChromeHidden ? 'hidden' : ''}`}
+        aria-label="Primary"
+      >
         {navItems.map((item) => (
           <Link
             key={item.path}
