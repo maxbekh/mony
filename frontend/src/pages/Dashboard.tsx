@@ -13,6 +13,7 @@ import {
 import { Link } from 'react-router-dom';
 import { FinanceTrendChart } from '../components/FinanceTrendChart';
 import { api } from '../services/api';
+import { formatCurrency } from '../utils/currency';
 import type {
   AnalyticsQueryParams,
   Category,
@@ -218,11 +219,7 @@ const Dashboard: React.FC = () => {
     .filter((item) => item.category_key === null)
     .reduce((accumulator, item) => accumulator + Math.abs(item.total_amount_minor), 0);
 
-  const formatAmount = (amountMinor: number, currency = 'EUR') =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(amountMinor / 100);
+  const formatAmount = formatCurrency;
 
   const categoryLabels = new Map(categories.map((category) => [category.key, category.label]));
   const getCategoryLabel = (categoryKey: string | null) =>

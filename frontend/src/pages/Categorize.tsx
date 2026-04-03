@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Check, SkipForward, Tags } from 'lucide-react';
 import { api } from '../services/api';
+import { formatCurrency } from '../utils/currency';
 import type { Category, Transaction } from '../types';
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -98,11 +99,7 @@ const Categorize: React.FC = () => {
     }
   };
 
-  const formatAmount = (amountMinor: number, currency: string) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(amountMinor / 100);
+  const formatAmount = formatCurrency;
 
   return (
     <div className="page">

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
+import { formatCurrency } from '../utils/currency';
 import type { Category, Transaction, TransactionListParams } from '../types';
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -318,11 +319,7 @@ const Transactions: React.FC = () => {
     );
   };
 
-  const formatAmount = (amountMinor: number, currency: string) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(amountMinor / 100);
+  const formatAmount = formatCurrency;
 
   const nextPage = () => {
     if (currentOffset + currentLimit < totalCount) {

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { FinanceTrendChart } from '../components/FinanceTrendChart';
 import { api } from '../services/api';
+import { formatCurrency } from '../utils/currency';
 import type { Category, MonthlySpendingByCategory, SpendingByCategory } from '../types';
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -104,11 +105,7 @@ const Analytics: React.FC = () => {
   const totalSpending = spendingRows.reduce((sum, row) => sum + Math.abs(row.total_amount_minor), 0);
   const totalIncome = incomeRows.reduce((sum, row) => sum + row.total_amount_minor, 0);
 
-  const formatAmount = (amountMinor: number, currency = 'EUR') =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(amountMinor / 100);
+  const formatAmount = formatCurrency;
 
   useEffect(() => {
     if (spendingRows.length === 0) {

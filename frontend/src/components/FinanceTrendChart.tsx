@@ -109,6 +109,20 @@ export const FinanceTrendChart: React.FC<FinanceTrendChartProps> = ({
   const activeIndex = hoveredIndex;
   const activePoint = activeIndex === null ? null : chartPoints[activeIndex];
   const segmentWidth = points.length <= 1 ? chartInnerWidth : chartInnerWidth / (points.length - 1);
+  const tooltipWidth = 168;
+  const tooltipHeight = 78;
+  const tooltipLeftPx = activePoint
+    ? Math.min(Math.max(activePoint.x - tooltipWidth / 2, 12), chartWidth - tooltipWidth - 12)
+    : 0;
+  const tooltipTopPx = activePoint
+    ? Math.max(
+        Math.min(
+          activePoint.y < 92 ? activePoint.y + 20 : activePoint.y - tooltipHeight - 14,
+          chartHeight - tooltipHeight - 10,
+        ),
+        10,
+      )
+    : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -129,9 +143,9 @@ export const FinanceTrendChart: React.FC<FinanceTrendChartProps> = ({
           <div
             style={{
               position: 'absolute',
-              left: `calc(${((activePoint.x / chartWidth) * 100).toFixed(2)}% - 72px)`,
-              top: `calc(${((activePoint.y / chartHeight) * 100).toFixed(2)}% - 64px)`,
-              minWidth: '144px',
+              left: `${(tooltipLeftPx / chartWidth) * 100}%`,
+              top: `${(tooltipTopPx / chartHeight) * 100}%`,
+              width: `${tooltipWidth}px`,
               pointerEvents: 'none',
               padding: '0.7rem 0.8rem',
               borderRadius: '0.95rem',
@@ -217,17 +231,17 @@ export const FinanceTrendChart: React.FC<FinanceTrendChartProps> = ({
                 <circle
                   cx={point.x}
                   cy={point.y}
-                  r={isActive ? 6 : 3.5}
                   fill="var(--surface-color)"
                   stroke={palette.dot}
-                  strokeWidth={isActive ? 3 : 2}
+                  strokeWidth={isActive ? 2.5 : 1.75}
                   style={{ transition: 'all 180ms ease' }}
+                  r={isActive ? 5 : 2.75}
                 />
                 {isActive && (
                   <circle
                     cx={point.x}
                     cy={point.y}
-                    r="11"
+                    r="9"
                     fill={palette.dot}
                     opacity="0.12"
                   />
@@ -282,8 +296,24 @@ export const FinanceTrendChart: React.FC<FinanceTrendChartProps> = ({
             >
               <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{point.label}</div>
               <div style={{ fontSize: '0.86rem', fontWeight: 700, marginTop: '0.3rem' }}>
-                {isActive ? formatAmount(point.valueMinor, point.currency) : point.caption ?? ''}
+                {formatAmount(point.valueMinor, point.currency)}
               </div>
+              {point.caption && (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem', marginTop: '0.18rem' }}>
+                  {point.caption}
+                </div>
+              )}
+              <div
+                style={{
+                  marginTop: '0.55rem',
+                  height: '2px',
+                  width: isActive ? '100%' : '36%',
+                  borderRadius: '999px',
+                  background: `linear-gradient(90deg, ${palette.lineStart} 0%, ${palette.lineEnd} 100%)`,
+                  opacity: isActive ? 1 : 0.45,
+                  transition: 'width 180ms ease, opacity 180ms ease',
+                }}
+              />
             </button>
           );
         })}
