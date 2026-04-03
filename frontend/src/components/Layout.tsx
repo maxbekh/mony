@@ -65,6 +65,44 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     };
   }, []);
 
+  React.useEffect(() => {
+    const root = document.documentElement;
+    let frameId = 0;
+
+    const writePointer = (clientX: number, clientY: number) => {
+      root.style.setProperty('--pointer-x', `${clientX}px`);
+      root.style.setProperty('--pointer-y', `${clientY}px`);
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (frameId !== 0) {
+        cancelAnimationFrame(frameId);
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        writePointer(event.clientX, event.clientY);
+      });
+    };
+
+    const handlePointerLeave = () => {
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+      writePointer(centerX, centerY);
+    };
+
+    handlePointerLeave();
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('pointerleave', handlePointerLeave);
+
+    return () => {
+      if (frameId !== 0) {
+        cancelAnimationFrame(frameId);
+      }
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerleave', handlePointerLeave);
+    };
+  }, []);
+
   return (
     <div className="layout">
       <header className={`mobile-header ${isMobileChromeHidden ? 'hidden' : ''}`}>

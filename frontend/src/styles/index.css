@@ -1,4 +1,6 @@
 :root {
+  --pointer-x: 50vw;
+  --pointer-y: 50vh;
   --primary-color: #0f766e;
   --primary-hover: #115e59;
   --primary-contrast: #ffffff;
@@ -81,8 +83,11 @@ body {
   color: var(--text-main);
   line-height: 1.5;
   background-image:
+    radial-gradient(circle 180px at var(--pointer-x) var(--pointer-y), rgba(255, 255, 255, 0.16), transparent 70%),
+    radial-gradient(circle 280px at calc(var(--pointer-x) * 0.92) calc(var(--pointer-y) * 1.04), rgba(249, 115, 22, 0.05), transparent 72%),
     radial-gradient(circle at top left, color-mix(in srgb, var(--primary-color) 8%, transparent), transparent 28%),
     radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.06), transparent 24%);
+  transition: background-image 180ms ease-out;
 }
 
 button,
@@ -157,11 +162,15 @@ textarea {
   font-size: 1.5rem;
   font-weight: 800;
   color: transparent;
-  background: linear-gradient(135deg, var(--primary-color) 0%, #f97316 100%);
+  background:
+    radial-gradient(circle 72px at calc(var(--pointer-x) - 32px) calc(var(--pointer-y) - 32px), rgba(255, 255, 255, 0.85), transparent 32%),
+    linear-gradient(135deg, var(--primary-color) 0%, #f97316 100%);
   -webkit-background-clip: text;
   background-clip: text;
   text-decoration: none;
   letter-spacing: -0.04em;
+  filter: saturate(1.02);
+  transition: filter 180ms ease;
 }
 
 .nav {
@@ -229,7 +238,9 @@ textarea {
   height: 2.5rem;
   padding: 0 0.7rem;
   border-radius: 0.9rem;
-  background: linear-gradient(135deg, var(--surface-accent-strong) 0%, var(--surface-accent) 100%);
+  background:
+    radial-gradient(circle 54px at calc(var(--pointer-x) - 24px) calc(var(--pointer-y) - 24px), rgba(255, 255, 255, 0.38), transparent 36%),
+    linear-gradient(135deg, var(--surface-accent-strong) 0%, var(--surface-accent) 100%);
   color: var(--primary-color);
   font-size: 0.92rem;
   font-weight: 800;
