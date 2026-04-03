@@ -709,6 +709,7 @@ const Transactions: React.FC = () => {
         }
         .category-cell {
           min-width: 170px;
+          width: 220px;
         }
         .category-key {
           margin-top: 0.3rem;
@@ -716,12 +717,14 @@ const Transactions: React.FC = () => {
         .badge {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           padding: 0.2rem 0.65rem;
           border-radius: 9999px;
           font-size: 0.75rem;
           font-weight: 600;
         }
         .category-trigger {
+          width: 100%;
           gap: 0.35rem;
           border: none;
           cursor: pointer;
@@ -737,8 +740,9 @@ const Transactions: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
-          min-width: 13rem;
-          padding: 0.75rem;
+          width: 100%;
+          max-width: 15rem;
+          padding: 0.65rem;
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
           background: #f8fafc;
@@ -768,10 +772,10 @@ const Transactions: React.FC = () => {
         }
         .inline-category-select {
           width: 100%;
-          min-height: 2.5rem;
+          min-height: 2.35rem;
           border: 1px solid var(--border-color);
           border-radius: 0.6rem;
-          padding: 0.65rem 0.75rem;
+          padding: 0.55rem 0.7rem;
           background: white;
           font: inherit;
         }
@@ -780,6 +784,7 @@ const Transactions: React.FC = () => {
           align-items: center;
           justify-content: space-between;
           gap: 0.75rem;
+          min-height: 1.25rem;
         }
         .inline-link-button {
           border: none;
