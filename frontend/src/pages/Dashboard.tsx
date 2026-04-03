@@ -754,7 +754,9 @@ const Dashboard: React.FC = () => {
           display: flex;
           align-items: center;
           gap: 1.25rem;
-          background: var(--surface-color);
+          background:
+            var(--surface-reflection),
+            var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
         }
@@ -802,7 +804,9 @@ const Dashboard: React.FC = () => {
           margin-top: 0;
         }
         .card {
-          background: var(--surface-color);
+          background:
+            var(--surface-reflection),
+            var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
           overflow: hidden;
@@ -841,6 +845,7 @@ const Dashboard: React.FC = () => {
           padding: 1rem 1.1rem;
           border-radius: 1rem;
           background:
+            var(--surface-reflection),
             radial-gradient(circle at top left, color-mix(in srgb, var(--primary-color) 16%, transparent), transparent 36%),
             var(--surface-muted);
           border: 1px solid var(--border-color);

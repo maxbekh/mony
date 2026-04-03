@@ -1,6 +1,14 @@
 :root {
   --pointer-x: 50vw;
   --pointer-y: 50vh;
+  --app-reflection:
+    radial-gradient(circle 760px at var(--pointer-x) var(--pointer-y), rgba(255, 255, 255, 0.028), transparent 72%);
+  --app-warmth:
+    radial-gradient(circle 920px at calc(var(--pointer-x) * 1.02) calc(var(--pointer-y) * 0.98), rgba(249, 115, 22, 0.014), transparent 74%);
+  --surface-reflection:
+    radial-gradient(circle 420px at calc(var(--pointer-x) - 88px) calc(var(--pointer-y) - 76px), rgba(255, 255, 255, 0.08), transparent 68%);
+  --surface-reflection-soft:
+    radial-gradient(circle 360px at calc(var(--pointer-x) - 96px) calc(var(--pointer-y) - 80px), rgba(255, 255, 255, 0.055), transparent 68%);
   --primary-color: #0f766e;
   --primary-hover: #115e59;
   --primary-contrast: #ffffff;
@@ -38,6 +46,14 @@
 }
 
 :root[data-theme='dark'] {
+  --app-reflection:
+    radial-gradient(circle 820px at var(--pointer-x) var(--pointer-y), rgba(94, 234, 212, 0.024), transparent 74%);
+  --app-warmth:
+    radial-gradient(circle 940px at calc(var(--pointer-x) * 1.02) calc(var(--pointer-y) * 0.98), rgba(249, 115, 22, 0.012), transparent 76%);
+  --surface-reflection:
+    radial-gradient(circle 420px at calc(var(--pointer-x) - 88px) calc(var(--pointer-y) - 76px), rgba(255, 255, 255, 0.035), transparent 68%);
+  --surface-reflection-soft:
+    radial-gradient(circle 360px at calc(var(--pointer-x) - 96px) calc(var(--pointer-y) - 80px), rgba(255, 255, 255, 0.022), transparent 68%);
   --primary-color: #5eead4;
   --primary-hover: #2dd4bf;
   --primary-contrast: #08111f;
@@ -83,10 +99,10 @@ body {
   color: var(--text-main);
   line-height: 1.5;
   background-image:
-    radial-gradient(circle 180px at var(--pointer-x) var(--pointer-y), rgba(255, 255, 255, 0.16), transparent 70%),
-    radial-gradient(circle 280px at calc(var(--pointer-x) * 0.92) calc(var(--pointer-y) * 1.04), rgba(249, 115, 22, 0.05), transparent 72%),
-    radial-gradient(circle at top left, color-mix(in srgb, var(--primary-color) 8%, transparent), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.06), transparent 24%);
+    var(--app-reflection),
+    var(--app-warmth),
+    radial-gradient(circle at top left, color-mix(in srgb, var(--primary-color) 6%, transparent), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.035), transparent 26%);
   transition: background-image 180ms ease-out;
 }
 
@@ -109,6 +125,7 @@ textarea {
 .sidebar {
   width: var(--sidebar-width);
   background:
+    var(--surface-reflection-soft),
     linear-gradient(180deg, color-mix(in srgb, var(--surface-accent-strong) 24%, transparent), transparent 20%),
     var(--sidebar-bg);
   border-right: 1px solid var(--border-color);
@@ -209,7 +226,7 @@ textarea {
 
 .mobile-header {
   display: none;
-  background-color: var(--surface-color);
+  background: var(--surface-color);
   border-bottom: 1px solid var(--border-color);
   padding: 0 1rem;
   min-height: var(--header-height);
@@ -286,7 +303,9 @@ textarea {
   bottom: max(0.75rem, env(safe-area-inset-bottom));
   z-index: 70;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  background: var(--surface-elevated);
+  background:
+    var(--surface-reflection-soft),
+    var(--surface-elevated);
   backdrop-filter: blur(18px);
   box-shadow: var(--shadow-floating);
   border-radius: 1.25rem;
@@ -348,7 +367,9 @@ textarea {
 
 .auth-card {
   width: min(100%, 440px);
-  background: var(--surface-elevated);
+  background:
+    var(--surface-reflection),
+    var(--surface-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: 1.5rem;
   padding: 2rem;
@@ -472,7 +493,9 @@ textarea {
   display: grid;
   gap: 1rem;
   padding: 1.5rem;
-  background: var(--surface-elevated);
+  background:
+    var(--surface-reflection),
+    var(--surface-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: 1.25rem;
   box-shadow: var(--shadow-soft);
@@ -494,7 +517,9 @@ textarea {
   padding: 0.95rem 1rem;
   border: 1px solid var(--border-subtle);
   border-radius: 1rem;
-  background: var(--surface-muted);
+  background:
+    var(--surface-reflection),
+    var(--surface-muted);
 }
 
 .activity-copy {

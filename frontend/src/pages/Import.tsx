@@ -339,7 +339,9 @@ const Import: React.FC = () => {
           align-items: start;
         }
         .card {
-          background: var(--surface-color);
+          background:
+            var(--surface-reflection),
+            var(--surface-color);
           border-radius: 0.75rem;
           border: 1px solid var(--border-color);
         }

@@ -650,7 +650,9 @@ const Transactions: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 1rem;
-          background: var(--surface-color);
+          background:
+            var(--surface-reflection),
+            var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
           padding: 1rem;
@@ -722,7 +724,9 @@ const Transactions: React.FC = () => {
           font-size: 0.875rem;
         }
         .card {
-          background: var(--surface-color);
+          background:
+            var(--surface-reflection),
+            var(--surface-color);
           border-radius: 0.75rem;
           border: 1px solid var(--border-color);
           overflow: hidden;
@@ -794,7 +798,9 @@ const Transactions: React.FC = () => {
           padding: 0.7rem 0.85rem 0.7rem 0.7rem;
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
-          background: var(--surface-muted);
+          background:
+            var(--surface-reflection),
+            var(--surface-muted);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
         }
         .inline-category-header {
@@ -868,7 +874,9 @@ const Transactions: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 0.9rem;
-          background: var(--surface-color);
+          background:
+            var(--surface-reflection),
+            var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 1rem;
           padding: 1rem;
@@ -900,7 +908,9 @@ const Transactions: React.FC = () => {
           gap: 0.8rem;
           padding: 0.7rem 0.8rem;
           border-radius: 0.85rem;
-          background: var(--surface-muted);
+          background:
+            var(--surface-reflection),
+            var(--surface-muted);
           font-size: 0.82rem;
         }
         .mobile-category-block {

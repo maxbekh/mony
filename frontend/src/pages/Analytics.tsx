@@ -597,7 +597,9 @@ const Analytics: React.FC = () => {
         }
         .toolbar-card,
         .card {
-          background: var(--surface-color);
+          background:
+            var(--surface-reflection),
+            var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
         }
@@ -685,7 +687,9 @@ const Analytics: React.FC = () => {
           gap: 1rem;
         }
         .stat-card {
-          background: var(--surface-color);
+          background:
+            var(--surface-reflection),
+            var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
           padding: 1.25rem;
@@ -876,7 +880,9 @@ const Analytics: React.FC = () => {
           gap: 0.75rem;
         }
         .trend-insight-card {
-          background: linear-gradient(180deg, color-mix(in srgb, var(--surface-muted) 80%, white 20%), var(--surface-color));
+          background:
+            var(--surface-reflection),
+            linear-gradient(180deg, color-mix(in srgb, var(--surface-muted) 80%, white 20%), var(--surface-color));
           border: none;
           border-radius: 0.9rem;
           padding: 1rem;
@@ -969,7 +975,9 @@ const Analytics: React.FC = () => {
           padding: 0.95rem 1rem;
           border: 1px solid var(--border-color);
           border-radius: 0.9rem;
-          background: var(--surface-muted);
+          background:
+            var(--surface-reflection),
+            var(--surface-muted);
         }
         .mobile-analytics-top,
         .mobile-analytics-meta {

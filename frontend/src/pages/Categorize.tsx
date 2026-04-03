@@ -214,7 +214,9 @@ const Categorize: React.FC = () => {
           color: var(--text-muted);
         }
         .card {
-          background: var(--surface-color);
+          background:
+            var(--surface-reflection),
+            var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
           overflow: hidden;
@@ -229,7 +231,9 @@ const Categorize: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 1rem;
-          background: linear-gradient(180deg, var(--surface-color) 0%, var(--surface-muted) 100%);
+          background:
+            var(--surface-reflection),
+            linear-gradient(180deg, var(--surface-color) 0%, var(--surface-muted) 100%);
         }
         .queue-progress {
           display: flex;
@@ -399,7 +403,9 @@ const Categorize: React.FC = () => {
           }
           .category-panel {
             padding: 1rem;
-            background: linear-gradient(180deg, var(--surface-color) 0%, var(--surface-accent) 100%);
+            background:
+              var(--surface-reflection),
+              linear-gradient(180deg, var(--surface-color) 0%, var(--surface-accent) 100%);
           }
           .panel-header {
             flex-direction: column;
