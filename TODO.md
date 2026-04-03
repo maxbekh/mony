@@ -40,6 +40,20 @@ This file tracks the progress of the **mony** project.
 - [x] **First POC: Full flow from CSV import to Dashboard visualization**
 - [ ] Logic: Background processing for large imports (optional for MVP)
 
+## Next Product Slices
+
+- [ ] Import management: list imports with source metadata and support deletion flows
+- [ ] Import management: define deletion semantics for batches and related transactions
+- [ ] Transaction editing: support category and description management with clear validation rules
+- [ ] Dashboard: add selectable periods for summary views
+- [ ] Product/UI: separate dashboard summaries from deeper analytics flows
+- [ ] Prepare authentication-friendly boundaries without implementing auth yet
+
+## Notes For Upcoming Work
+
+- New data management features should preserve financial integrity and avoid hidden rewrites.
+- Authentication remains deferred, but route and state design should stay compatible with future protection and scoping.
+
 ## Infrastructure & DX
 
 - [x] Makefile improvements (build, lint, test)
