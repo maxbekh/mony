@@ -14,6 +14,7 @@ import type {
   DeleteImportResponse,
   AnalyticsQueryParams,
   AnalyticsResponse,
+  MonthlyAnalyticsResponse,
   StatusPayload,
 } from '../types';
 
@@ -155,6 +156,16 @@ export const api = {
     const { data } = await client.get<AnalyticsResponse>('/v1/analytics/spending-by-category', {
       params,
     });
+    return data;
+  },
+
+  getMonthlyAnalyticsSpending: async (params: AnalyticsQueryParams = {}) => {
+    const { data } = await client.get<MonthlyAnalyticsResponse>(
+      '/v1/analytics/spending-by-category-monthly',
+      {
+        params,
+      },
+    );
     return data;
   },
 

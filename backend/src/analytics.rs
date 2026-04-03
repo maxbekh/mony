@@ -30,9 +30,23 @@ pub struct SpendingByCategory {
     pub transaction_count: i64,
 }
 
+#[derive(Debug, Serialize, FromRow)]
+pub struct MonthlySpendingByCategory {
+    pub month_start: NaiveDate,
+    pub category_key: Option<String>,
+    pub total_amount_minor: i64,
+    pub currency: String,
+    pub transaction_count: i64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct AnalyticsResponse {
     pub spending_by_category: Vec<SpendingByCategory>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MonthlyAnalyticsResponse {
+    pub monthly_spending_by_category: Vec<MonthlySpendingByCategory>,
 }
 
 impl AnalyticsParams {
@@ -95,6 +109,53 @@ pub async fn get_spending_by_category(
 
     Ok(AnalyticsResponse {
         spending_by_category: items,
+    })
+}
+
+pub async fn get_monthly_spending_by_category(
+    pool: &PgPool,
+    params: AnalyticsParams,
+) -> Result<MonthlyAnalyticsResponse, AnalyticsError> {
+    let params = params.normalized()?;
+
+    let mut query = QueryBuilder::new(
+        r#"
+        SELECT
+            DATE_TRUNC('month', transaction_date)::DATE AS month_start,
+            category_key,
+            SUM(amount_minor)::BIGINT AS total_amount_minor,
+            currency,
+            COUNT(*)::BIGINT AS transaction_count
+        FROM ledger_transaction
+        "#,
+    );
+
+    let mut has_where = false;
+
+    if let Some(date_from) = params.date_from {
+        push_filter(&mut query, &mut has_where, "transaction_date >= ");
+        query.push_bind(date_from);
+    }
+
+    if let Some(date_to) = params.date_to {
+        push_filter(&mut query, &mut has_where, "transaction_date <= ");
+        query.push_bind(date_to);
+    }
+
+    query.push(
+        r#"
+        GROUP BY DATE_TRUNC('month', transaction_date)::DATE, category_key, currency
+        ORDER BY month_start ASC, ABS(SUM(amount_minor)) DESC, category_key ASC
+        "#,
+    );
+
+    let items = query
+        .build_query_as::<MonthlySpendingByCategory>()
+        .fetch_all(pool)
+        .await?;
+
+    Ok(MonthlyAnalyticsResponse {
+        monthly_spending_by_category: items,
     })
 }
 

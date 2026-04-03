@@ -10,7 +10,10 @@ use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    analytics::{get_spending_by_category, AnalyticsError, AnalyticsParams, AnalyticsResponse},
+    analytics::{
+        get_monthly_spending_by_category, get_spending_by_category, AnalyticsError,
+        AnalyticsParams, AnalyticsResponse, MonthlyAnalyticsResponse,
+    },
     auth::{
         bootstrap, bootstrap_status, change_password, jwks, list_auth_events, list_sessions, login,
         logout, logout_all, refresh, require_auth, revoke_session_handler, session,
@@ -56,6 +59,10 @@ pub fn build_router(state: AppState) -> Router {
             "/v1/analytics/spending-by-category",
             get(get_analytics_spending),
         )
+        .route(
+            "/v1/analytics/spending-by-category-monthly",
+            get(get_analytics_monthly_spending),
+        )
         .route("/v1/categories", get(get_categories))
         .route("/v1/auth/session", get(session))
         .route("/v1/auth/logout", post(logout))
@@ -91,6 +98,17 @@ async fn get_analytics_spending(
     Query(params): Query<AnalyticsParams>,
 ) -> Result<Json<AnalyticsResponse>, (StatusCode, String)> {
     let response = get_spending_by_category(&state.db, params)
+        .await
+        .map_err(map_analytics_error)?;
+
+    Ok(Json(response))
+}
+
+async fn get_analytics_monthly_spending(
+    State(state): State<AppState>,
+    Query(params): Query<AnalyticsParams>,
+) -> Result<Json<MonthlyAnalyticsResponse>, (StatusCode, String)> {
+    let response = get_monthly_spending_by_category(&state.db, params)
         .await
         .map_err(map_analytics_error)?;
 

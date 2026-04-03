@@ -75,7 +75,7 @@ This file tracks the progress of the **mony** project.
 ## Phase 5: Dashboard Intelligence & Personalization
 
 - [ ] **(Task 5.1)** Add a dashboard widget model with default widgets, show/hide controls, ordering, and pinned categories
-- [ ] **(Task 5.2)** Add analytics endpoints for monthly time series grouped by category and optionally merchant
+- [x] **(Task 5.2)** Add analytics endpoints for monthly time series grouped by category and optionally merchant
 - [ ] **(Task 5.3)** Add period comparison analytics for current vs previous equivalent window with amount and percentage deltas
 - [ ] **(Task 5.4)** Detect recurring payments or subscription-like patterns with visible confidence and correction flows
 - [ ] **(Task 5.5)** Add anomaly and review widgets for spikes, large transactions, and uncategorized or low-confidence items

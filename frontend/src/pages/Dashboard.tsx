@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { CalendarRange, PieChart, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { CalendarRange, LineChart, PieChart, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import type { AnalyticsQueryParams, Category, SpendingByCategory } from '../types';
+import type {
+  AnalyticsQueryParams,
+  Category,
+  MonthlySpendingByCategory,
+  SpendingByCategory,
+} from '../types';
 
 type PeriodKey = '30d' | '90d' | '12m' | 'all';
 
@@ -13,6 +18,16 @@ const PERIOD_OPTIONS: Array<{ key: PeriodKey; label: string; description: string
   { key: '12m', label: '12 months', description: 'Rolling year' },
   { key: 'all', label: 'All time', description: 'Full imported history' },
 ];
+
+const FALLBACK_TREND_RANGE: AnalyticsQueryParams = {
+  date_from: (() => {
+    const date = new Date();
+    date.setMonth(date.getMonth() - 5);
+    date.setDate(1);
+    return formatDateInput(date);
+  })(),
+  date_to: formatDateInput(new Date()),
+};
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (axios.isAxiosError(error)) {
@@ -59,7 +74,9 @@ function buildAnalyticsParams(period: PeriodKey): AnalyticsQueryParams {
 const Dashboard: React.FC = () => {
   const [period, setPeriod] = useState<PeriodKey>('30d');
   const [analytics, setAnalytics] = useState<SpendingByCategory[]>([]);
+  const [monthlyAnalytics, setMonthlyAnalytics] = useState<MonthlySpendingByCategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedTrendCategory, setSelectedTrendCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,11 +86,14 @@ const Dashboard: React.FC = () => {
       setError(null);
 
       try {
-        const [data, categoryData] = await Promise.all([
-          api.getAnalyticsSpending(buildAnalyticsParams(period)),
+        const periodParams = buildAnalyticsParams(period);
+        const [data, monthlyData, categoryData] = await Promise.all([
+          api.getAnalyticsSpending(periodParams),
+          api.getMonthlyAnalyticsSpending(periodParams.date_from ? periodParams : FALLBACK_TREND_RANGE),
           api.getCategories(),
         ]);
         setAnalytics(data.spending_by_category);
+        setMonthlyAnalytics(monthlyData.monthly_spending_by_category);
         setCategories(categoryData);
       } catch (fetchError) {
         setError(getErrorMessage(fetchError, 'Failed to fetch dashboard data.'));
@@ -113,6 +133,46 @@ const Dashboard: React.FC = () => {
   const categoryLabels = new Map(categories.map((category) => [category.key, category.label]));
   const getCategoryLabel = (categoryKey: string | null) =>
     categoryKey ? categoryLabels.get(categoryKey) ?? categoryKey : 'Uncategorized';
+
+  useEffect(() => {
+    if (spendingCategories.length === 0) {
+      if (selectedTrendCategory !== null) {
+        setSelectedTrendCategory(null);
+      }
+      return;
+    }
+
+    const hasSelection = spendingCategories.some((item) => item.category_key === selectedTrendCategory);
+    if (!hasSelection) {
+      setSelectedTrendCategory(spendingCategories[0].category_key);
+    }
+  }, [selectedTrendCategory, spendingCategories]);
+
+  const selectedTrendSeries = monthlyAnalytics
+    .filter((item) => item.total_amount_minor < 0 && item.category_key === selectedTrendCategory)
+    .sort((left, right) => left.month_start.localeCompare(right.month_start));
+
+  const trendPoints = selectedTrendSeries.map((item) => ({
+    monthLabel: new Date(`${item.month_start}T00:00:00Z`).toLocaleDateString('en-US', {
+      month: 'short',
+      year: '2-digit',
+      timeZone: 'UTC',
+    }),
+    amountMinor: Math.abs(item.total_amount_minor),
+    currency: item.currency,
+  }));
+
+  const trendMax = trendPoints.reduce((max, item) => Math.max(max, item.amountMinor), 0);
+  const latestTrendPoint = trendPoints[trendPoints.length - 1];
+  const previousTrendPoint = trendPoints[trendPoints.length - 2];
+  const trendDeltaMinor =
+    latestTrendPoint && previousTrendPoint
+      ? latestTrendPoint.amountMinor - previousTrendPoint.amountMinor
+      : null;
+  const trendDeltaPercent =
+    trendDeltaMinor !== null && previousTrendPoint && previousTrendPoint.amountMinor > 0
+      ? (trendDeltaMinor / previousTrendPoint.amountMinor) * 100
+      : null;
 
   return (
     <div className="page">
@@ -264,6 +324,95 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      <div className="card trend-card">
+        <div className="card-header">
+          <LineChart size={20} />
+          <div className="trend-header-copy">
+            <h2>Monthly category trend</h2>
+            <p>Track a category over time to spot drift instead of only looking at one period total.</p>
+          </div>
+        </div>
+        <div className="card-body trend-body">
+          <div className="trend-toolbar">
+            <label className="trend-label" htmlFor="dashboard-trend-category">
+              Category
+            </label>
+            <select
+              id="dashboard-trend-category"
+              className="trend-select"
+              value={selectedTrendCategory ?? ''}
+              onChange={(event) => setSelectedTrendCategory(event.target.value || null)}
+              disabled={loading || spendingCategories.length === 0}
+            >
+              {spendingCategories.length === 0 ? (
+                <option value="">No spending categories</option>
+              ) : (
+                spendingCategories.slice(0, 8).map((item) => (
+                  <option key={item.category_key ?? 'uncategorized'} value={item.category_key ?? ''}>
+                    {getCategoryLabel(item.category_key)}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          {loading ? (
+            <p className="text-center py-8">Loading trend...</p>
+          ) : trendPoints.length === 0 ? (
+            <p className="text-center py-8">Not enough monthly data for this category yet.</p>
+          ) : (
+            <>
+              <div className="trend-chart" aria-label="Monthly spending chart">
+                {trendPoints.map((point) => (
+                  <div key={point.monthLabel} className="trend-column">
+                    <div
+                      className="trend-bar"
+                      style={{
+                        height: `${trendMax === 0 ? 0 : Math.max((point.amountMinor / trendMax) * 100, 8)}%`,
+                      }}
+                    />
+                    <span className="trend-month">{point.monthLabel}</span>
+                    <strong className="trend-amount">
+                      {formatAmount(point.amountMinor, point.currency)}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+
+              <div className="trend-summary">
+                <div className="trend-summary-item">
+                  <span>Latest month</span>
+                  <strong>
+                    {latestTrendPoint
+                      ? formatAmount(latestTrendPoint.amountMinor, latestTrendPoint.currency)
+                      : 'N/A'}
+                  </strong>
+                </div>
+                <div className="trend-summary-item">
+                  <span>Previous month</span>
+                  <strong>
+                    {previousTrendPoint
+                      ? formatAmount(previousTrendPoint.amountMinor, previousTrendPoint.currency)
+                      : 'N/A'}
+                  </strong>
+                </div>
+                <div className="trend-summary-item">
+                  <span>Trend</span>
+                  <strong className={trendDeltaMinor !== null && trendDeltaMinor > 0 ? 'trend-up' : 'trend-down'}>
+                    {trendDeltaMinor === null
+                      ? 'Need 2 months'
+                      : `${trendDeltaMinor > 0 ? '+' : ''}${formatAmount(
+                          trendDeltaMinor,
+                          latestTrendPoint?.currency ?? 'EUR',
+                        )}${trendDeltaPercent !== null ? ` (${trendDeltaPercent.toFixed(1)}%)` : ''}`}
+                  </strong>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
       <style>{`
         .page {
           display: flex;
@@ -375,6 +524,9 @@ const Dashboard: React.FC = () => {
           grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
           gap: 1.5rem;
         }
+        .trend-card {
+          margin-top: 0;
+        }
         .card {
           background: var(--surface-color);
           border: 1px solid var(--border-color);
@@ -391,6 +543,15 @@ const Dashboard: React.FC = () => {
         .card-header h2 {
           font-size: 1.125rem;
           font-weight: 600;
+        }
+        .trend-header-copy {
+          display: flex;
+          flex-direction: column;
+          gap: 0.15rem;
+        }
+        .trend-header-copy p {
+          color: var(--text-muted);
+          font-size: 0.875rem;
         }
         .card-body {
           padding: 1.5rem;
@@ -449,12 +610,100 @@ const Dashboard: React.FC = () => {
           border-bottom: none;
           padding-bottom: 0;
         }
+        .trend-body {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+        .trend-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+        .trend-label {
+          font-size: 0.875rem;
+          color: var(--text-muted);
+          font-weight: 600;
+        }
+        .trend-select {
+          min-width: 220px;
+          min-height: 2.75rem;
+          padding: 0.7rem 0.85rem;
+          border-radius: 0.75rem;
+          border: 1px solid var(--border-color);
+          background: var(--surface-color);
+          color: var(--text-main);
+        }
+        .trend-chart {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+          gap: 0.85rem;
+          align-items: end;
+          min-height: 260px;
+          padding: 1rem;
+          border-radius: 1rem;
+          background:
+            linear-gradient(180deg, color-mix(in srgb, var(--primary-color) 8%, transparent), transparent 40%),
+            var(--surface-muted);
+        }
+        .trend-column {
+          display: flex;
+          flex-direction: column;
+          justify-content: end;
+          align-items: stretch;
+          gap: 0.5rem;
+          min-height: 228px;
+        }
+        .trend-bar {
+          min-height: 0;
+          border-radius: 0.9rem 0.9rem 0.35rem 0.35rem;
+          background: linear-gradient(180deg, #f97316 0%, #dc2626 100%);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+        .trend-month {
+          color: var(--text-muted);
+          font-size: 0.75rem;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+        .trend-amount {
+          font-size: 0.82rem;
+          line-height: 1.2;
+        }
+        .trend-summary {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 0.9rem;
+        }
+        .trend-summary-item {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+          padding: 1rem;
+          border-radius: 0.9rem;
+          border: 1px solid var(--border-color);
+          background: var(--surface-muted);
+        }
+        .trend-summary-item span {
+          color: var(--text-muted);
+          font-size: 0.8rem;
+        }
+        .trend-up {
+          color: var(--danger-text);
+        }
+        .trend-down {
+          color: var(--success-text);
+        }
         .text-center { text-align: center; }
         .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
         .text-muted { color: var(--text-muted); }
         @media (max-width: 960px) {
           .dashboard-grid {
             grid-template-columns: 1fr;
+          }
+          .trend-chart {
+            grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
           }
         }
       `}</style>

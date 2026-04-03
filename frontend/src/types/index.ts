@@ -104,6 +104,18 @@ export interface AnalyticsResponse {
   spending_by_category: SpendingByCategory[];
 }
 
+export interface MonthlySpendingByCategory {
+  month_start: string;
+  category_key: string | null;
+  total_amount_minor: number;
+  currency: string;
+  transaction_count: number;
+}
+
+export interface MonthlyAnalyticsResponse {
+  monthly_spending_by_category: MonthlySpendingByCategory[];
+}
+
 export interface StatusPayload {
   service: string;
   status: string;

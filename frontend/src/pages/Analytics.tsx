@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { ArrowDownCircle, ArrowUpCircle, CalendarSearch, PieChart, TableProperties } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, CalendarSearch, LineChart, PieChart, TableProperties } from 'lucide-react';
 import { api } from '../services/api';
-import type { Category, SpendingByCategory } from '../types';
+import type { Category, MonthlySpendingByCategory, SpendingByCategory } from '../types';
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (axios.isAxiosError(error)) {
@@ -35,6 +35,8 @@ const INITIAL_DATE_TO = todayIsoDate();
 const Analytics: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [analytics, setAnalytics] = useState<SpendingByCategory[]>([]);
+  const [monthlyAnalytics, setMonthlyAnalytics] = useState<MonthlySpendingByCategory[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState(INITIAL_DATE_FROM);
   const [dateTo, setDateTo] = useState(INITIAL_DATE_TO);
   const [loading, setLoading] = useState(true);
@@ -45,14 +47,19 @@ const Analytics: React.FC = () => {
     setError(null);
 
     try {
-      const [analyticsResponse, categoriesResponse] = await Promise.all([
+      const [analyticsResponse, monthlyResponse, categoriesResponse] = await Promise.all([
         api.getAnalyticsSpending({
+          date_from: from || undefined,
+          date_to: to || undefined,
+        }),
+        api.getMonthlyAnalyticsSpending({
           date_from: from || undefined,
           date_to: to || undefined,
         }),
         api.getCategories(),
       ]);
       setAnalytics(analyticsResponse.spending_by_category);
+      setMonthlyAnalytics(monthlyResponse.monthly_spending_by_category);
       setCategories(categoriesResponse);
     } catch (loadError) {
       setError(getErrorMessage(loadError, 'Failed to fetch analytics.'));
@@ -88,6 +95,41 @@ const Analytics: React.FC = () => {
       style: 'currency',
       currency,
     }).format(amountMinor / 100);
+
+  useEffect(() => {
+    if (spendingRows.length === 0) {
+      if (selectedCategory !== null) {
+        setSelectedCategory(null);
+      }
+      return;
+    }
+
+    const hasSelection = spendingRows.some((row) => row.category_key === selectedCategory);
+    if (!hasSelection) {
+      setSelectedCategory(spendingRows[0].category_key);
+    }
+  }, [selectedCategory, spendingRows]);
+
+  const selectedTrendRows = monthlyAnalytics
+    .filter((item) => item.total_amount_minor < 0 && item.category_key === selectedCategory)
+    .sort((left, right) => left.month_start.localeCompare(right.month_start));
+
+  const trendRows = selectedTrendRows.map((row) => ({
+    ...row,
+    absolute_amount_minor: Math.abs(row.total_amount_minor),
+    label: new Date(`${row.month_start}T00:00:00Z`).toLocaleDateString('en-US', {
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    }),
+  }));
+  const trendMax = trendRows.reduce((max, row) => Math.max(max, row.absolute_amount_minor), 0);
+  const trendLatest = trendRows[trendRows.length - 1];
+  const trendPrevious = trendRows[trendRows.length - 2];
+  const rollingAverage =
+    trendRows.length === 0
+      ? 0
+      : trendRows.reduce((sum, row) => sum + row.absolute_amount_minor, 0) / trendRows.length;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,6 +313,80 @@ const Analytics: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <LineChart size={18} />
+          <h2>Monthly category trend</h2>
+        </div>
+        <div className="card-body trend-section">
+          <div className="trend-toolbar">
+            <label className="control trend-control">
+              <span className="control-label">Category</span>
+              <select
+                value={selectedCategory ?? ''}
+                onChange={(event) => setSelectedCategory(event.target.value || null)}
+                className="control-input"
+                disabled={loading || spendingRows.length === 0}
+              >
+                {spendingRows.length === 0 ? (
+                  <option value="">No spending categories</option>
+                ) : (
+                  spendingRows.map((row) => (
+                    <option key={row.category_key ?? 'uncategorized'} value={row.category_key ?? ''}>
+                      {getCategoryLabel(row.category_key)}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+          </div>
+
+          {loading ? (
+            <p className="empty">Loading trend...</p>
+          ) : trendRows.length === 0 ? (
+            <p className="empty">No monthly trend is available for this category in the selected period.</p>
+          ) : (
+            <>
+              <div className="trend-chart">
+                {trendRows.map((row) => (
+                  <div key={`${row.month_start}-${row.category_key ?? 'uncategorized'}`} className="trend-column">
+                    <div
+                      className="trend-bar"
+                      style={{
+                        height: `${trendMax === 0 ? 0 : Math.max((row.absolute_amount_minor / trendMax) * 100, 8)}%`,
+                      }}
+                    />
+                    <strong>{formatAmount(row.absolute_amount_minor, row.currency)}</strong>
+                    <span>{row.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="trend-insights">
+                <div className="trend-insight-card">
+                  <span className="stat-label">Latest month</span>
+                  <strong className="stat-value">
+                    {trendLatest ? formatAmount(trendLatest.absolute_amount_minor, trendLatest.currency) : 'N/A'}
+                  </strong>
+                </div>
+                <div className="trend-insight-card">
+                  <span className="stat-label">Previous month</span>
+                  <strong className="stat-value">
+                    {trendPrevious ? formatAmount(trendPrevious.absolute_amount_minor, trendPrevious.currency) : 'N/A'}
+                  </strong>
+                </div>
+                <div className="trend-insight-card">
+                  <span className="stat-label">Rolling average</span>
+                  <strong className="stat-value">
+                    {formatAmount(Math.round(rollingAverage), trendLatest?.currency ?? trendPrevious?.currency ?? 'EUR')}
+                  </strong>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -476,6 +592,61 @@ const Analytics: React.FC = () => {
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 1rem;
         }
+        .trend-section {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        .trend-toolbar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 1rem;
+        }
+        .trend-control {
+          min-width: min(100%, 280px);
+        }
+        .trend-chart {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+          gap: 0.85rem;
+          align-items: end;
+          min-height: 280px;
+          padding: 1rem;
+          border-radius: 1rem;
+          background:
+            linear-gradient(180deg, color-mix(in srgb, #f97316 10%, transparent), transparent 45%),
+            var(--surface-muted);
+        }
+        .trend-column {
+          min-height: 240px;
+          display: flex;
+          flex-direction: column;
+          justify-content: end;
+          gap: 0.4rem;
+        }
+        .trend-bar {
+          border-radius: 0.9rem 0.9rem 0.35rem 0.35rem;
+          background: linear-gradient(180deg, #fb923c 0%, #ea580c 55%, #dc2626 100%);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+        }
+        .trend-column span {
+          color: var(--text-muted);
+          font-size: 0.75rem;
+        }
+        .trend-column strong {
+          font-size: 0.84rem;
+        }
+        .trend-insights {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 0.75rem;
+        }
+        .trend-insight-card {
+          background: var(--surface-muted);
+          border: 1px solid var(--border-color);
+          border-radius: 0.9rem;
+          padding: 1rem;
+        }
         .card-header {
           padding: 1rem 1.25rem;
           border-bottom: 1px solid var(--border-color);
@@ -592,6 +763,9 @@ const Analytics: React.FC = () => {
           }
           .date-controls {
             grid-template-columns: 1fr 1fr;
+          }
+          .trend-chart {
+            grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
           }
         }
         @media (max-width: 720px) {
