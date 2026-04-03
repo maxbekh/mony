@@ -1,6 +1,6 @@
 ENV_FILE ?= .env
 
-.PHONY: check foundation-check compose-config backend-check frontend-check frontend-build frontend-lint up-db down run-backend recategorize
+.PHONY: check foundation-check compose-config backend-check frontend-check frontend-build frontend-lint up-db down run-backend recategorize services-install services-start services-stop services-restart services-status
 
 check: foundation-check backend-check frontend-check
 
@@ -42,3 +42,18 @@ run-backend:
 
 recategorize:
 	cargo run -p mony-backend -- recategorize
+
+services-install:
+	./scripts/mony-services install
+
+services-start:
+	./scripts/mony-services start
+
+services-stop:
+	./scripts/mony-services stop
+
+services-restart:
+	./scripts/mony-services restart all
+
+services-status:
+	./scripts/mony-services status

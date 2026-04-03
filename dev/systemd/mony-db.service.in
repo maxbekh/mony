@@ -1,0 +1,17 @@
+[Unit]
+Description=mony dev database (Docker Compose)
+After=docker.service
+Requires=docker.service
+PartOf=mony-dev.target
+
+[Service]
+User=root
+Type=oneshot
+WorkingDirectory=@REPO_ROOT@
+ExecStart=/bin/docker compose --env-file @REPO_ROOT@/.env up -d db
+ExecStop=/bin/docker compose --env-file @REPO_ROOT@/.env stop db
+RemainAfterExit=yes
+TimeoutStartSec=0
+
+[Install]
+WantedBy=mony-dev.target

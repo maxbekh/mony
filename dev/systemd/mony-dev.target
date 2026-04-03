@@ -1,0 +1,6 @@
+[Unit]
+Description=mony development stack
+Wants=mony-db.service mony-backend.service mony-frontend.service
+
+[Install]
+WantedBy=multi-user.target

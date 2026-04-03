@@ -1,0 +1,17 @@
+[Unit]
+Description=mony dev frontend (Vite)
+After=mony-backend.service
+Requires=mony-backend.service
+PartOf=mony-dev.target
+
+[Service]
+Environment=PATH=/bin:/usr/bin:/sbin:/usr/sbin
+User=root
+Type=simple
+WorkingDirectory=@REPO_ROOT@/frontend
+ExecStart=/bin/npm run dev -- --host 0.0.0.0 --port 5173
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=mony-dev.target

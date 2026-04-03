@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+units=(
+  mony-db.service
+  mony-backend.service
+  mony-frontend.service
+)
+
+usage() {
+  cat <<'EOF'
+Usage:
+  scripts/mony-services install
+  scripts/mony-services start
+  scripts/mony-services stop
+  scripts/mony-services restart [db|backend|frontend|all]
+  scripts/mony-services status
+  scripts/mony-services logs [db|backend|frontend]
+EOF
+}
+
+require_arg() {
+  if [[ $# -lt 1 ]]; then
+    usage
+    exit 1
+  fi
+}
+
+restart_one() {
+  case "${1}" in
+    db) systemctl restart mony-db.service ;;
+    backend) systemctl restart mony-backend.service ;;
+    frontend) systemctl restart mony-frontend.service ;;
+    all)
+      systemctl restart mony-db.service
+      systemctl restart mony-backend.service
+      systemctl restart mony-frontend.service
+      ;;
+    *)
+      echo "Unknown service: ${1}" >&2
+      exit 1
+      ;;
+  esac
+}
+
+logs_one() {
+  case "${1}" in
+    db) journalctl -u mony-db.service -f ;;
+    backend) journalctl -u mony-backend.service -f ;;
+    frontend) journalctl -u mony-frontend.service -f ;;
+    *)
+      echo "Unknown service: ${1}" >&2
+      exit 1
+      ;;
+  esac
+}
+
+require_arg "$@"
+
+case "$1" in
+  install)
+    exec "$(dirname "$0")/install-dev-services.sh"
+    ;;
+  start)
+    systemctl start mony-dev.target
+    ;;
+  stop)
+    systemctl stop mony-frontend.service
+    systemctl stop mony-backend.service
+    systemctl stop mony-db.service
+    ;;
+  restart)
+    restart_one "${2:-all}"
+    ;;
+  status)
+    systemctl status "${units[@]}" --no-pager
+    ;;
+  logs)
+    logs_one "${2:-backend}"
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac

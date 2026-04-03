@@ -1,0 +1,18 @@
+[Unit]
+Description=mony dev backend
+After=mony-db.service
+Requires=mony-db.service
+PartOf=mony-dev.target
+
+[Service]
+Environment=PATH=/root/.cargo/bin:/sbin:/bin:/usr/sbin:/usr/bin
+User=root
+Type=simple
+WorkingDirectory=@REPO_ROOT@
+EnvironmentFile=@REPO_ROOT@/.env
+ExecStart=/root/.cargo/bin/cargo run -p mony-backend
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=mony-dev.target

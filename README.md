@@ -201,6 +201,28 @@ npm install --prefix frontend
 npm run dev --prefix frontend
 ```
 
+### Optional detached local development with system services
+
+If you want the dev database, backend, and frontend to survive SSH disconnects and be restartable from a single shell session, install the provided `systemd` units:
+
+```bash
+chmod +x scripts/install-dev-services.sh scripts/mony-services
+make services-install
+make services-start
+```
+
+The frontend stays on `http://<host>:5173` and still proxies API requests to the backend on `127.0.0.1:3000`.
+
+Useful commands:
+
+```bash
+make services-status
+./scripts/mony-services restart backend
+./scripts/mony-services restart frontend
+./scripts/mony-services logs backend
+make services-stop
+```
+
 ### Admin password reset
 
 If you have shell access to the backend host and need to recover an account without the current password:
