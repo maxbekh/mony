@@ -55,6 +55,7 @@ This file tracks the progress of the **mony** project.
 - [x] Implement auth foundation: bootstrap admin, JWT access tokens, refresh token rotation, session audit, and protected web/API flows
 - [x] Product/UI: add system-aware dark mode with explicit light/dark override support
 - [x] Product/UI: rename Account to Settings and consolidate appearance, password, session, and security activity flows
+- [x] Product planning: define intelligent dashboard goals, default widgets, and configurable layout principles
 
 ## Phase 4: Authentication & Authorization
 
@@ -70,6 +71,15 @@ This file tracks the progress of the **mony** project.
 - [ ] **(Task 4.10)** Extend auth audit coverage and add filtering/pagination in Settings
 - [ ] **(Task 4.11)** Add MFA/TOTP support and recovery code flows
 - [ ] **(Task 4.12)** Prepare explicit OIDC identity mapping (`issuer` / `sub`) and provider integration boundaries
+
+## Phase 5: Dashboard Intelligence & Personalization
+
+- [ ] **(Task 5.1)** Add a dashboard widget model with default widgets, show/hide controls, ordering, and pinned categories
+- [ ] **(Task 5.2)** Add analytics endpoints for monthly time series grouped by category and optionally merchant
+- [ ] **(Task 5.3)** Add period comparison analytics for current vs previous equivalent window with amount and percentage deltas
+- [ ] **(Task 5.4)** Detect recurring payments or subscription-like patterns with visible confidence and correction flows
+- [ ] **(Task 5.5)** Add anomaly and review widgets for spikes, large transactions, and uncategorized or low-confidence items
+- [ ] **(Task 5.6)** Persist per-user dashboard preferences such as widget visibility, ordering, and default period
 
 ## Notes For Upcoming Work
 
@@ -87,6 +97,8 @@ This file tracks the progress of the **mony** project.
 - Add frontend tests around theme preference, `/account` to `/settings` redirect, and protected auth UX.
 - Define the next auth/authz layer: MFA, role or scope boundaries, and OIDC external identity mapping.
 - Build a local-only categorization memory layer that learns from confirmed edits without storing personal patterns in the public repository.
+- Add month-based category analytics so users can inspect trends like groceries spending over time.
+- Define the first configurable dashboard slice with a strong default layout and minimal but clear personalization.
 
 ## Infrastructure & DX
 

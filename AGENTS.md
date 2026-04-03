@@ -47,6 +47,58 @@ Agents should pick tasks from this list and **update `TODO.md`** to indicate the
 - **Task 4.6**: Integrate the web app with login, in-memory access tokens, `HttpOnly` refresh cookies, and CSRF protection on refresh/logout.
 - **Task 4.7**: Add auth-focused tests covering bootstrap, login, refresh, route protection, and revocation behavior.
 
+### Phase 5: Dashboard Intelligence & Personalization
+- **Task 5.1**: Define a dashboard widget system with a small set of default cards and charts plus user-controlled layout and visibility.
+- **Task 5.2**: Add time-series analytics endpoints grouped by month and category so the UI can answer questions like "groceries by month".
+- **Task 5.3**: Add comparative analytics (current period vs previous period) with absolute and percentage deltas by category, merchant, and income/spending totals.
+- **Task 5.4**: Surface recurring-payment and subscription-like transaction patterns with explicit confidence and easy user correction.
+- **Task 5.5**: Surface anomaly-oriented insights such as unusually high spending, category spikes, and uncategorized or low-confidence transactions.
+- **Task 5.6**: Persist per-user dashboard preferences (selected widgets, ordering, pinned categories, default period) without hard-coding one universal layout.
+
+## Product Direction: Intelligent Financial Dashboard
+
+The product should help users understand their money quickly, then let them go deeper without forcing everyone into the same dashboard. The default experience should feel useful immediately, but the long-term model should be a **user-configurable dashboard** built from small analytics widgets backed by stable server-side aggregates.
+
+### Dashboard Product Principles
+
+- **Useful by default**: Ship a strong out-of-the-box dashboard before exposing too many knobs.
+- **Configurable, not chaotic**: Let users show, hide, reorder, and pin widgets or categories, but keep the data model and interactions simple.
+- **Overview first, investigation second**: The dashboard should answer "what changed?" while the analytics screens answer "why?" and "where exactly?".
+- **Explainable insights**: Every smart insight must be traceable to visible transactions, categories, or comparison windows.
+- **Financially honest**: Avoid vanity metrics or misleading percentages on small bases. Always preserve exact integer-backed amounts.
+- **Local-first intelligence**: Prefer insights derived from the user's own categorized history before considering optional AI assistance.
+
+### Default Dashboard Widgets
+
+Agents building dashboard or analytics features should prioritize a compact default set such as:
+
+- **Spending by category (current period)**: Fast visual split of where money went.
+- **Monthly trend for a selected category**: Example: groceries spending by month over the last 6 or 12 months.
+- **Income vs expenses vs net savings**: Core cash-flow summary over the selected window.
+- **Period-over-period deltas**: Show what increased or decreased versus the previous month or previous equivalent period.
+- **Top merchants / payees**: Useful concentration view for identifying major recurring sinks.
+- **Recurring payments and subscriptions**: Detect repeated charges and show next expected cadence when confidence is sufficient.
+- **Large or unusual transactions**: Highlight outliers compared with the user's normal history.
+- **Category drift / uncategorized queue**: Surface transactions needing review, weak categorization, or newly emerging merchants.
+
+### Suggested Analytics Views Beyond The Dashboard
+
+- **Category over time**: One or more categories plotted monthly to answer questions like "how are groceries evolving over time?".
+- **Monthly spending heatmap**: Show spend intensity by month and category.
+- **Cash-flow timeline**: Show income and expense movement across weeks or months.
+- **Merchant deep dive**: Trend, count, average ticket, and latest transactions for a merchant.
+- **Category comparison table**: Current month, previous month, delta, rolling average, and share of total spend.
+- **Recurring commitments view**: Expected fixed or semi-fixed charges, grouped by cadence.
+
+### Implementation Guidance For Agents
+
+- Keep the backend contract widget-friendly: reusable aggregate endpoints are better than UI-specific one-off payloads.
+- Prefer server-side grouping for month/category/merchant analytics to avoid heavy client-side recomputation.
+- Define comparison windows explicitly (`current`, `previous_equivalent`, `rolling_n_months`) so the UI does not invent inconsistent logic.
+- Any "smart" labeling such as recurring payment or anomaly detection must expose a reason or confidence level.
+- User personalization should be limited to layout and preferences first; avoid building a full custom report builder too early.
+- If a widget cannot be backed by reliable data yet, omit it rather than guessing.
+
 ## Task Coordination Protocol
 
 1. **CLAIM**: Before starting, check `TODO.md`. If a task is not claimed, add your name next to it: `- [ ] (CLAIMED: @agent_name) Task description`.
