@@ -293,9 +293,29 @@ body {
   gap: 0.4rem;
 }
 
+.auth-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .auth-field span {
   font-size: 0.88rem;
   font-weight: 600;
+}
+
+.auth-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 999px;
+  background: rgba(219, 234, 254, 0.62);
+  color: var(--primary-color);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 0.18rem 0.55rem;
 }
 
 .auth-field input {
@@ -310,6 +330,12 @@ body {
 .auth-field input:focus {
   outline: 2px solid rgba(37, 99, 235, 0.22);
   border-color: var(--primary-color);
+}
+
+.auth-hint {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .auth-submit {

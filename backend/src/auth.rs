@@ -111,7 +111,7 @@ impl AuthState {
         &self,
         user_id: Uuid,
         session_id: Uuid,
-        email: &str,
+        username: &str,
         scopes: &[String],
     ) -> Result<(String, i64), AuthError> {
         let now = Utc::now();
@@ -120,7 +120,7 @@ impl AuthState {
             iss: self.issuer.clone(),
             aud: self.audience.clone(),
             sub: user_id.to_string(),
-            email: email.to_owned(),
+            preferred_username: username.to_owned(),
             jti: Uuid::now_v7().to_string(),
             sid: session_id.to_string(),
             scope: scopes.join(" "),
@@ -154,7 +154,7 @@ impl AuthState {
                 .map_err(|_| AuthError::Unauthorized("invalid subject".to_string()))?,
             session_id: Uuid::parse_str(&claims.sid)
                 .map_err(|_| AuthError::Unauthorized("invalid session".to_string()))?,
-            email: claims.email,
+            username: claims.preferred_username,
             scopes: claims
                 .scope
                 .split_whitespace()
@@ -187,7 +187,7 @@ struct AccessTokenClaims {
     iss: String,
     aud: String,
     sub: String,
-    email: String,
+    preferred_username: String,
     jti: String,
     sid: String,
     scope: String,
@@ -200,7 +200,7 @@ struct AccessTokenClaims {
 pub struct AuthenticatedUser {
     pub user_id: Uuid,
     pub session_id: Uuid,
-    pub email: String,
+    pub username: String,
     pub scopes: Vec<String>,
 }
 
@@ -265,14 +265,14 @@ impl IntoResponse for AuthError {
 
 #[derive(Debug, Deserialize)]
 pub struct BootstrapRequest {
-    pub email: String,
+    pub username: String,
     pub password: String,
     pub device_name: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
-    pub email: String,
+    pub username: String,
     pub password: String,
     pub device_name: Option<String>,
 }
@@ -280,7 +280,7 @@ pub struct LoginRequest {
 #[derive(Debug, Serialize)]
 pub struct AuthUserResponse {
     pub id: String,
-    pub email: String,
+    pub username: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -353,7 +353,7 @@ pub struct JwkKey {
 #[derive(Debug, FromRow)]
 struct UserRecord {
     id: Uuid,
-    email: String,
+    username: String,
     password_hash: String,
 }
 
@@ -380,7 +380,7 @@ struct RefreshTokenRecord {
     created_at: DateTime<Utc>,
     session_revoked_at: Option<DateTime<Utc>>,
     user_id: Uuid,
-    email: String,
+    username: String,
 }
 
 pub async fn require_auth(
@@ -422,7 +422,7 @@ pub async fn bootstrap(
         ));
     }
 
-    let email = normalize_email(&payload.email)?;
+    let username = normalize_username(&payload.username)?;
     validate_password(&payload.password)?;
     let password_hash = hash_password(&payload.password)?;
     let context = request_context(&headers, payload.device_name);
@@ -434,9 +434,9 @@ pub async fn bootstrap(
         .map_err(|error| AuthError::Internal(error.to_string()))?;
 
     let user_id = Uuid::now_v7();
-    sqlx::query("INSERT INTO auth_user (id, email, password_hash) VALUES ($1, $2, $3)")
+    sqlx::query("INSERT INTO auth_user (id, username, password_hash) VALUES ($1, $2, $3)")
         .bind(user_id)
-        .bind(&email)
+        .bind(&username)
         .bind(&password_hash)
         .execute(&mut *tx)
         .await
@@ -444,7 +444,7 @@ pub async fn bootstrap(
 
     let user = UserRecord {
         id: user_id,
-        email,
+        username,
         password_hash,
     };
     let session = create_session(&mut tx, &user, &context).await?;
@@ -471,8 +471,8 @@ pub async fn login(
     headers: HeaderMap,
     Json(payload): Json<LoginRequest>,
 ) -> Result<(HeaderMap, Json<AuthTokenPairResponse>), AuthError> {
-    let email = normalize_email(&payload.email)?;
-    let user = find_user_by_email(&state.db, &email)
+    let username = normalize_username(&payload.username)?;
+    let user = find_user_by_username(&state.db, &username)
         .await?
         .ok_or_else(|| AuthError::Unauthorized("invalid credentials".to_string()))?;
 
@@ -531,7 +531,7 @@ pub async fn refresh(
             rt.created_at,
             s.revoked_at AS session_revoked_at,
             s.user_id,
-            u.email
+            u.username
         FROM auth_refresh_token rt
         INNER JOIN auth_session s ON s.id = rt.session_id
         INNER JOIN auth_user u ON u.id = s.user_id
@@ -583,7 +583,7 @@ pub async fn refresh(
     let session = get_session(&mut tx, record.session_id).await?;
     let user = UserRecord {
         id: record.user_id,
-        email: record.email,
+        username: record.username,
         password_hash: String::new(),
     };
     let response =
@@ -670,7 +670,7 @@ pub async fn session(auth: AuthenticatedUser) -> Json<AuthSessionViewResponse> {
     Json(AuthSessionViewResponse {
         user: AuthUserResponse {
             id: auth.user_id.to_string(),
-            email: auth.email,
+            username: auth.username,
         },
         scopes: auth.scopes,
         session_id: auth.session_id.to_string(),
@@ -750,11 +750,14 @@ impl From<SessionRecord> for AuthSessionResponse {
     }
 }
 
-async fn find_user_by_email(pool: &PgPool, email: &str) -> Result<Option<UserRecord>, AuthError> {
+async fn find_user_by_username(
+    pool: &PgPool,
+    username: &str,
+) -> Result<Option<UserRecord>, AuthError> {
     sqlx::query_as::<_, UserRecord>(
-        "SELECT id, email, password_hash FROM auth_user WHERE email = $1",
+        "SELECT id, username, password_hash FROM auth_user WHERE username = $1",
     )
-    .bind(email)
+    .bind(username)
     .fetch_optional(pool)
     .await
     .map_err(|error| AuthError::Internal(error.to_string()))
@@ -862,7 +865,7 @@ async fn rotate_token_pair(
         .map(|scope| (*scope).to_owned())
         .collect();
     let (access_token, expires_in) =
-        auth.issue_access_token(user.id, session.id, &user.email, &scopes)?;
+        auth.issue_access_token(user.id, session.id, &user.username, &scopes)?;
 
     let mut headers = HeaderMap::new();
     append_cookie_header(
@@ -891,7 +894,7 @@ async fn rotate_token_pair(
             scopes,
             user: AuthUserResponse {
                 id: user.id.to_string(),
-                email: user.email.clone(),
+                username: user.username.clone(),
             },
             session: AuthSessionResponse::from(SessionRecord {
                 id: session.id,
@@ -970,12 +973,23 @@ async fn log_auth_event(
     Ok(())
 }
 
-fn normalize_email(input: &str) -> Result<String, AuthError> {
-    let email = input.trim().to_ascii_lowercase();
-    if email.is_empty() || !email.contains('@') {
-        return Err(AuthError::BadRequest("email must be valid".to_string()));
+fn normalize_username(input: &str) -> Result<String, AuthError> {
+    let username = input.trim().to_ascii_lowercase();
+    let is_valid = !username.is_empty()
+        && username.len() >= 3
+        && username.len() <= 64
+        && username.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-' | '@')
+        });
+
+    if !is_valid {
+        return Err(AuthError::BadRequest(
+            "username must be 3 to 64 characters and use only letters, numbers, '.', '_', '-', or '@'"
+                .to_string(),
+        ));
     }
-    Ok(email)
+
+    Ok(username)
 }
 
 fn validate_password(password: &str) -> Result<(), AuthError> {
@@ -1210,7 +1224,7 @@ mod tests {
             .issue_access_token(
                 uuid::Uuid::nil(),
                 uuid::Uuid::nil(),
-                "admin@example.com",
+                "owner",
                 &["transactions:read".to_string()],
             )
             .expect("token should issue");
@@ -1218,7 +1232,7 @@ mod tests {
             .verify_access_token(&token)
             .expect("token should verify");
 
-        assert_eq!(principal.email, "admin@example.com");
+        assert_eq!(principal.username, "owner");
         assert_eq!(principal.scopes, vec!["transactions:read"]);
     }
 

@@ -12,8 +12,8 @@ export interface AuthContextValue {
   user: AuthUser | null;
   session: AuthSession | null;
   scopes: string[];
-  login: (email: string, password: string) => Promise<void>;
-  bootstrap: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
+  bootstrap: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -113,16 +113,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [applyAuthResponse, clearAuth, clearRefreshTimer]);
 
   const login = React.useCallback(
-    async (email: string, password: string) => {
-      const response = await api.login(email, password, DEVICE_NAME);
+    async (username: string, password: string) => {
+      const response = await api.login(username, password, DEVICE_NAME);
       applyAuthResponse(response);
     },
     [applyAuthResponse],
   );
 
   const bootstrap = React.useCallback(
-    async (email: string, password: string) => {
-      const response = await api.bootstrap(email, password, DEVICE_NAME);
+    async (username: string, password: string) => {
+      const response = await api.bootstrap(username, password, DEVICE_NAME);
       applyAuthResponse(response);
     },
     [applyAuthResponse],

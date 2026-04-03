@@ -141,12 +141,12 @@ Then edit `.env` and at minimum replace:
   - keep `false` for local HTTP development
   - switch to `true` behind HTTPS in production
 
-The default `.env.example` already points to:
+The default `.env.example` already points to host-local key paths:
 
-- `/run/secrets/mony-jwt-private.pem`
-- `/run/secrets/mony-jwt-public.pem`
+- `.local/keys/mony-jwt-private.pem`
+- `.local/keys/mony-jwt-public.pem`
 
-Those paths are mounted automatically inside the backend container from `./.local/keys`.
+When running in Docker Compose, the backend container overrides those paths internally and reads the same files through `/run/secrets`.
 
 ### 3. Start the full stack with Docker Compose
 
@@ -185,20 +185,13 @@ You can still use Docker only for PostgreSQL and run the backend/frontend direct
 make up-db
 ```
 
-2. Export auth key paths for host execution:
-
-```bash
-export MONY_AUTH_JWT_PRIVATE_KEY_PATH="$PWD/.local/keys/mony-jwt-private.pem"
-export MONY_AUTH_JWT_PUBLIC_KEY_PATH="$PWD/.local/keys/mony-jwt-public.pem"
-```
-
-3. Run the backend:
+2. Run the backend:
 
 ```bash
 make run-backend
 ```
 
-4. Run the frontend in another shell:
+3. Run the frontend in another shell:
 
 ```bash
 npm install --prefix frontend

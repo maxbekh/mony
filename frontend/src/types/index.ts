@@ -111,7 +111,7 @@ export interface StatusPayload {
 
 export interface AuthUser {
   id: string;
-  email: string;
+  username: string;
 }
 
 export interface AuthSession {

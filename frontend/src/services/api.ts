@@ -65,18 +65,18 @@ export const api = {
     return data;
   },
 
-  bootstrap: async (email: string, password: string, deviceName: string) => {
+  bootstrap: async (username: string, password: string, deviceName: string) => {
     const { data } = await client.post<AuthTokenPairResponse>('/v1/auth/bootstrap', {
-      email,
+      username,
       password,
       device_name: deviceName,
     });
     return data;
   },
 
-  login: async (email: string, password: string, deviceName: string) => {
+  login: async (username: string, password: string, deviceName: string) => {
     const { data } = await client.post<AuthTokenPairResponse>('/v1/auth/login', {
-      email,
+      username,
       password,
       device_name: deviceName,
     });

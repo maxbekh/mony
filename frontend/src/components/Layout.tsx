@@ -78,7 +78,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="sidebar-header">
           <div>
             <h1 className="logo">mony</h1>
-            <p className="sidebar-user">{user?.email}</p>
+            <p className="sidebar-user">{user?.username}</p>
           </div>
           <button className="sidebar-logout" onClick={() => void logout()} type="button">
             Sign out

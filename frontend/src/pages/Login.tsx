@@ -15,7 +15,7 @@ function formatError(error: unknown) {
 
 export default function Login() {
   const { status, bootstrapRequired, login, bootstrap } = useAuth();
-  const [email, setEmail] = React.useState('');
+  const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
@@ -31,9 +31,9 @@ export default function Login() {
 
     try {
       if (bootstrapRequired) {
-        await bootstrap(email, password);
+        await bootstrap(username, password);
       } else {
-        await login(email, password);
+        await login(username, password);
       }
     } catch (error) {
       setErrorMessage(formatError(error));
@@ -51,34 +51,52 @@ export default function Login() {
           <p>
             {bootstrapRequired
               ? 'Create the first administrator account. This bootstrap flow is disabled after the first account exists.'
-              : 'Use your local mony account. Access tokens stay in memory and refresh uses secure cookies.'}
+              : 'Use your local mony username. Access tokens stay in memory and refresh uses secure cookies.'}
           </p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="auth-field">
-            <span>Email</span>
+            <span>Username</span>
             <input
-              autoComplete="email"
-              name="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="username"
+              name="username"
+              spellCheck={false}
+              type="text"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder={bootstrapRequired ? 'owner' : 'Enter your username'}
               required
             />
+            {bootstrapRequired ? (
+              <p className="auth-hint">
+                Lowercase letters, numbers, `.`, `_`, `-`, and `@` are accepted.
+              </p>
+            ) : null}
           </label>
 
           <label className="auth-field">
-            <span>Password</span>
+            <div className="auth-field-heading">
+              <span>Password</span>
+              {bootstrapRequired ? <span className="auth-pill">12+ chars</span> : null}
+            </div>
             <input
               autoComplete={bootstrapRequired ? 'new-password' : 'current-password'}
               name="password"
               type="password"
-              minLength={12}
+              minLength={bootstrapRequired ? 12 : undefined}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              placeholder={
+                bootstrapRequired ? 'Choose a long passphrase' : 'Enter your password'
+              }
               required
             />
+            {bootstrapRequired ? (
+              <p className="auth-hint">
+                Use a long passphrase. Length matters more than complexity rules.
+              </p>
+            ) : null}
           </label>
 
           {errorMessage ? <p className="auth-error">{errorMessage}</p> : null}

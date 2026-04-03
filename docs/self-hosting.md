@@ -46,7 +46,9 @@ Available environment variables:
 
 Authentication notes:
 
+- `.env` should use host paths such as `.local/keys/mony-jwt-private.pem` and `.local/keys/mony-jwt-public.pem`.
 - The default compose setup mounts `./.local/keys` into the backend container at `/run/secrets`.
+- Docker Compose overrides the backend JWT key paths internally so the same `.env` also works with `make run-backend` on the host.
 - The backend signs short-lived JWT access tokens with the private key and publishes the public key through `/.well-known/jwks.json`.
 - The first account is created through the one-time bootstrap flow exposed at `POST /v1/auth/bootstrap` while no account exists. Public registration is intentionally disabled after that.
 - For production, terminate TLS in front of the app and set `MONY_AUTH_SECURE_COOKIES=true`.
