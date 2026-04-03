@@ -17,7 +17,7 @@ function formatError(error: unknown) {
   return 'Unable to update password.';
 }
 
-export default function Account() {
+export default function Settings() {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
   const { theme, preference, setPreference } = useTheme();
@@ -87,7 +87,7 @@ export default function Account() {
     <section className="settings-panel">
       <div className="settings-header">
         <div>
-          <span className="settings-eyebrow">Account</span>
+          <span className="settings-eyebrow">Settings</span>
           <h1>Change password</h1>
           <p>{user?.username}</p>
         </div>
