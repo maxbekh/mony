@@ -45,6 +45,7 @@ export interface TransactionListParams {
 
 export interface TransactionUpdateParams {
   category_key?: string | null;
+  description?: string;
   metadata?: Record<string, JsonValue> | null;
 }
 

@@ -4,6 +4,8 @@ use serde_json::Value;
 use sqlx::{FromRow, PgPool, QueryBuilder};
 use uuid::Uuid;
 
+use crate::categories::is_valid_category_key;
+
 #[derive(Debug, Deserialize)]
 pub struct TransactionListParams {
     pub limit: Option<u32>,
@@ -46,7 +48,8 @@ pub struct TransactionListResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct TransactionUpdateParams {
-    pub category_key: Option<String>,
+    pub category_key: Option<Value>,
+    pub description: Option<Value>,
     pub metadata: Option<serde_json::Value>,
 }
 
@@ -294,10 +297,19 @@ pub async fn update_transaction(
 
     let mut has_update = false;
 
-    if let Some(category_key) = params.category_key {
-        let normalized = normalize_optional(Some(category_key));
+    if let Some(category_key) = normalize_category_update(params.category_key)? {
         query.push("category_key = ");
-        query.push_bind(normalized);
+        query.push_bind(category_key);
+        has_update = true;
+    }
+
+    if let Some(description) = normalize_description_update(params.description)? {
+        if has_update {
+            query.push(", ");
+        }
+
+        query.push("description = ");
+        query.push_bind(description);
         has_update = true;
     }
 
@@ -363,6 +375,52 @@ fn normalize_metadata_update(
     }
 }
 
+fn normalize_category_update(
+    category_key: Option<Value>,
+) -> Result<Option<Option<String>>, TransactionUpdateError> {
+    match category_key {
+        None => Ok(None),
+        Some(Value::Null) => Ok(Some(None)),
+        Some(Value::String(category_key)) => {
+            let normalized = normalize_optional(Some(category_key));
+
+            match normalized {
+                None => Ok(Some(None)),
+                Some(category_key) => {
+                    if !is_valid_category_key(&category_key) {
+                        return Err(TransactionUpdateError::Validation(
+                            "category_key must reference a known category".to_string(),
+                        ));
+                    }
+
+                    Ok(Some(Some(category_key)))
+                }
+            }
+        }
+        Some(_) => Err(TransactionUpdateError::Validation(
+            "category_key must be a string or null".to_string(),
+        )),
+    }
+}
+
+fn normalize_description_update(
+    description: Option<Value>,
+) -> Result<Option<String>, TransactionUpdateError> {
+    match description {
+        None => Ok(None),
+        Some(Value::String(description)) => {
+            let normalized = normalize_optional(Some(description)).ok_or(
+                TransactionUpdateError::Validation("description must not be empty".to_string()),
+            )?;
+
+            Ok(Some(normalized))
+        }
+        Some(_) => Err(TransactionUpdateError::Validation(
+            "description must be a string".to_string(),
+        )),
+    }
+}
+
 fn push_filter<'a>(
     query: &mut QueryBuilder<'a, sqlx::Postgres>,
     has_where_clause: &mut bool,
@@ -381,11 +439,12 @@ fn push_filter<'a>(
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     use super::{
-        normalize_metadata_update, MetadataUpdate, NormalizedTransactionListParams,
-        TransactionListError, TransactionListParams,
+        normalize_category_update, normalize_description_update, normalize_metadata_update,
+        MetadataUpdate, NormalizedTransactionListParams, TransactionListError,
+        TransactionListParams, TransactionUpdateError,
     };
 
     #[test]
@@ -590,6 +649,52 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "validation error: metadata must be a JSON object or null"
+        );
+    }
+
+    #[test]
+    fn accepts_known_category_keys_and_null_reset() {
+        assert_eq!(
+            normalize_category_update(Some(json!("food.grocery"))).unwrap(),
+            Some(Some("food.grocery".to_string()))
+        );
+        assert_eq!(
+            normalize_category_update(Some(Value::Null)).unwrap(),
+            Some(None)
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_category_keys() {
+        let error = normalize_category_update(Some(json!("unknown.category")))
+            .expect_err("unknown category should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            TransactionUpdateError::Validation(
+                "category_key must reference a known category".to_string()
+            )
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn normalizes_trimmed_description_updates() {
+        assert_eq!(
+            normalize_description_update(Some(json!("  Grocery run  "))).unwrap(),
+            Some("Grocery run".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_empty_description_updates() {
+        let error = normalize_description_update(Some(json!("   ")))
+            .expect_err("empty description should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            TransactionUpdateError::Validation("description must not be empty".to_string())
+                .to_string()
         );
     }
 }

@@ -1,12 +1,35 @@
 import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { ChevronLeft, ChevronRight, Pencil, Search, X } from 'lucide-react';
 import { api } from '../services/api';
-import type { Transaction, TransactionListParams } from '../types';
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { Category, Transaction, TransactionListParams } from '../types';
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (axios.isAxiosError(error)) {
+    const payload = error.response?.data;
+    if (typeof payload === 'string' && payload.trim() !== '') {
+      return payload;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim() !== '') {
+    return error.message;
+  }
+
+  return fallback;
+}
 
 const Transactions: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategoryKey, setEditCategoryKey] = useState('');
   const [params, setParams] = useState<TransactionListParams>({
     limit: 20,
     offset: 0,
@@ -15,25 +38,52 @@ const Transactions: React.FC = () => {
   const currentLimit = params.limit ?? 20;
   const currentOffset = params.offset ?? 0;
 
-  useEffect(() => {
-    const fetchTransactions = async () => {
-      setLoading(true);
-      try {
-        const response = await api.listTransactions({
-          limit: currentLimit,
-          offset: currentOffset,
-        });
-        setTransactions(response.items);
-        setTotalCount(response.total_count);
-      } catch (error) {
-        console.error('Failed to fetch transactions:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadTransactions = async (requestParams: TransactionListParams) => {
+    setLoading(true);
+    setPageError(null);
 
-    void fetchTransactions();
+    try {
+      const response = await api.listTransactions(requestParams);
+      setTransactions(response.items);
+      setTotalCount(response.total_count);
+    } catch (error) {
+      setPageError(getErrorMessage(error, 'Failed to fetch transactions.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadTransactions({
+      limit: currentLimit,
+      offset: currentOffset,
+    });
   }, [currentOffset, currentLimit]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await api.getCategories();
+        setCategories(response);
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+      }
+    })();
+  }, []);
+
+  const openEditor = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setEditDescription(transaction.description);
+    setEditCategoryKey(transaction.category_key ?? '');
+    setEditError(null);
+  };
+
+  const closeEditor = () => {
+    setEditingTransaction(null);
+    setEditDescription('');
+    setEditCategoryKey('');
+    setEditError(null);
+  };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setParams({ ...params, search: e.target.value, offset: 0 });
@@ -41,26 +91,43 @@ const Transactions: React.FC = () => {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    void (async () => {
-      setLoading(true);
-      try {
-        const response = await api.listTransactions(params);
-        setTransactions(response.items);
-        setTotalCount(response.total_count);
-      } catch (error) {
-        console.error('Failed to fetch transactions:', error);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    void loadTransactions(params);
   };
 
-  const formatAmount = (amount_minor: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount_minor / 100);
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingTransaction) {
+      return;
+    }
+
+    setSaving(true);
+    setEditError(null);
+
+    try {
+      const updated = await api.updateTransaction(editingTransaction.id, {
+        description: editDescription,
+        category_key: editCategoryKey || null,
+      });
+
+      setTransactions((current) =>
+        current.map((transaction) =>
+          transaction.id === updated.id ? updated : transaction,
+        ),
+      );
+      closeEditor();
+    } catch (error) {
+      setEditError(getErrorMessage(error, 'Failed to update transaction.'));
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const formatAmount = (amountMinor: number, currency: string) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+    }).format(amountMinor / 100);
 
   const nextPage = () => {
     if (currentOffset + currentLimit < totalCount) {
@@ -88,10 +155,14 @@ const Transactions: React.FC = () => {
               onChange={handleSearchChange}
               className="search-input"
             />
-            <button type="submit" className="button primary">Search</button>
+            <button type="submit" className="button primary">
+              Search
+            </button>
           </form>
         </div>
       </div>
+
+      {pageError && <div className="notice error">{pageError}</div>}
 
       <div className="card">
         <table className="table">
@@ -102,38 +173,59 @@ const Transactions: React.FC = () => {
               <th>Category</th>
               <th>Source</th>
               <th className="text-right">Amount</th>
+              <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="text-center py-8">Loading transactions...</td>
+                <td colSpan={6} className="text-center py-8">
+                  Loading transactions...
+                </td>
               </tr>
             ) : transactions.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-8">No transactions found.</td>
+                <td colSpan={6} className="text-center py-8">
+                  No transactions found.
+                </td>
               </tr>
             ) : (
-              transactions.map((t) => (
-                <tr key={t.id}>
-                  <td>{t.transaction_date}</td>
+              transactions.map((transaction) => (
+                <tr key={transaction.id}>
+                  <td>{transaction.transaction_date}</td>
                   <td>
-                    <div className="transaction-description">{t.description}</div>
-                    {t.external_reference && (
-                      <div className="text-muted text-xs">{t.external_reference}</div>
+                    <div className="transaction-description">{transaction.description}</div>
+                    {transaction.external_reference && (
+                      <div className="text-muted text-xs">{transaction.external_reference}</div>
                     )}
                   </td>
                   <td>
-                    <span className={`badge ${t.category_key ? 'category' : 'uncategorized'}`}>
-                      {t.category_key || 'Uncategorized'}
+                    <span
+                      className={`badge ${transaction.category_key ? 'category' : 'uncategorized'}`}
+                    >
+                      {transaction.category_key || 'Uncategorized'}
                     </span>
                   </td>
                   <td>
-                    <div className="text-sm">{t.source_name}</div>
-                    <div className="text-muted text-xs">{t.source_account_ref}</div>
+                    <div className="text-sm">{transaction.source_name}</div>
+                    <div className="text-muted text-xs">{transaction.source_account_ref}</div>
                   </td>
-                  <td className={`text-right font-medium ${t.amount_minor < 0 ? 'amount-negative' : 'amount-positive'}`}>
-                    {formatAmount(t.amount_minor, t.currency)}
+                  <td
+                    className={`text-right font-medium ${
+                      transaction.amount_minor < 0 ? 'amount-negative' : 'amount-positive'
+                    }`}
+                  >
+                    {formatAmount(transaction.amount_minor, transaction.currency)}
+                  </td>
+                  <td className="text-right">
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => openEditor(transaction)}
+                      aria-label={`Edit transaction ${transaction.description}`}
+                    >
+                      <Pencil size={16} />
+                    </button>
                   </td>
                 </tr>
               ))
@@ -143,7 +235,8 @@ const Transactions: React.FC = () => {
 
         <div className="pagination">
           <div className="text-sm text-muted">
-            Showing {currentOffset + 1} to {Math.min(currentOffset + currentLimit, totalCount)} of {totalCount} transactions
+            Showing {totalCount === 0 ? 0 : currentOffset + 1} to{' '}
+            {Math.min(currentOffset + currentLimit, totalCount)} of {totalCount} transactions
           </div>
           <div className="pagination-controls">
             <button
@@ -163,6 +256,87 @@ const Transactions: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {editingTransaction && (
+        <div className="modal-backdrop" onClick={closeEditor}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2>Edit transaction</h2>
+                <p className="text-muted">
+                  Update the working description and manual category.
+                </p>
+              </div>
+              <button type="button" className="icon-button" onClick={closeEditor}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="edit-form">
+              <div className="form-group">
+                <label htmlFor="edit-description">Description</label>
+                <input
+                  id="edit-description"
+                  type="text"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="form-input"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-category">Category</label>
+                <select
+                  id="edit-category"
+                  value={editCategoryKey}
+                  onChange={(e) => setEditCategoryKey(e.target.value)}
+                  className="form-input"
+                >
+                  <option value="">Uncategorized</option>
+                  {categories.map((category) => (
+                    <option key={category.key} value={category.key}>
+                      {category.label} ({category.key})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="summary-grid">
+                <div>
+                  <span className="summary-label">Date</span>
+                  <strong>{editingTransaction.transaction_date}</strong>
+                </div>
+                <div>
+                  <span className="summary-label">Amount</span>
+                  <strong>
+                    {formatAmount(editingTransaction.amount_minor, editingTransaction.currency)}
+                  </strong>
+                </div>
+                <div>
+                  <span className="summary-label">Source</span>
+                  <strong>{editingTransaction.source_name}</strong>
+                </div>
+                <div>
+                  <span className="summary-label">Account</span>
+                  <strong>{editingTransaction.source_account_ref}</strong>
+                </div>
+              </div>
+
+              {editError && <div className="notice error">{editError}</div>}
+
+              <div className="modal-actions">
+                <button type="button" className="button secondary" onClick={closeEditor}>
+                  Cancel
+                </button>
+                <button type="submit" className="button primary" disabled={saving}>
+                  {saving ? 'Saving...' : 'Save changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .page {
@@ -263,6 +437,26 @@ const Transactions: React.FC = () => {
         .button.primary:hover {
           background: var(--primary-hover);
         }
+        .button.secondary {
+          background: white;
+          border-color: var(--border-color);
+          color: var(--text-main);
+        }
+        .button:disabled, .icon-button:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .icon-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 2.25rem;
+          height: 2.25rem;
+          border-radius: 0.5rem;
+          border: 1px solid var(--border-color);
+          background: white;
+          cursor: pointer;
+        }
         .pagination {
           display: flex;
           justify-content: space-between;
@@ -274,9 +468,108 @@ const Transactions: React.FC = () => {
           display: flex;
           gap: 0.5rem;
         }
-        .pagination-controls button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
+        .notice {
+          padding: 0.875rem 1rem;
+          border-radius: 0.75rem;
+          border: 1px solid;
+        }
+        .notice.error {
+          background: #fef2f2;
+          border-color: #fca5a5;
+          color: #991b1b;
+        }
+        .modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.45);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem;
+          z-index: 20;
+        }
+        .modal-card {
+          width: min(100%, 36rem);
+          background: white;
+          border-radius: 1rem;
+          border: 1px solid var(--border-color);
+          box-shadow: 0 20px 50px rgba(15, 23, 42, 0.16);
+          padding: 1.5rem;
+        }
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 1rem;
+          margin-bottom: 1.25rem;
+        }
+        .edit-form {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        .form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        .form-group label {
+          font-size: 0.875rem;
+          font-weight: 600;
+        }
+        .form-input {
+          width: 100%;
+          padding: 0.75rem;
+          border-radius: 0.5rem;
+          border: 1px solid var(--border-color);
+          font-size: 0.875rem;
+          outline: none;
+        }
+        .form-input:focus {
+          border-color: var(--primary-color);
+        }
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 0.75rem;
+          padding: 1rem;
+          border-radius: 0.75rem;
+          background: #f8fafc;
+        }
+        .summary-grid > div {
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+        .summary-label {
+          color: var(--text-muted);
+          font-size: 0.75rem;
+          text-transform: uppercase;
+        }
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.75rem;
+        }
+        @media (max-width: 900px) {
+          .table th:nth-child(4),
+          .table td:nth-child(4) {
+            display: none;
+          }
+        }
+        @media (max-width: 640px) {
+          .search-form {
+            width: 100%;
+          }
+          .search-input {
+            width: 100%;
+          }
+          .summary-grid {
+            grid-template-columns: 1fr;
+          }
+          .modal-actions {
+            flex-direction: column-reverse;
+          }
         }
       `}</style>
     </div>

@@ -98,6 +98,10 @@ pub fn list_categories() -> Vec<Category> {
         .collect()
 }
 
+pub fn is_valid_category_key(key: &str) -> bool {
+    SYSTEM_CATEGORIES.iter().any(|rule| rule.key == key)
+}
+
 fn format_label(key: &str) -> String {
     key.split('.')
         .next_back()
@@ -158,5 +162,11 @@ mod tests {
     fn formats_labels_correctly() {
         assert_eq!(format_label("food.grocery"), "Grocery");
         assert_eq!(format_label("income.salary_bonus"), "Salary bonus");
+    }
+
+    #[test]
+    fn validates_known_category_keys() {
+        assert!(is_valid_category_key("food.grocery"));
+        assert!(!is_valid_category_key("unknown.category"));
     }
 }
