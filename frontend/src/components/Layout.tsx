@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Upload, PieChart, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Receipt, Upload, PieChart, Menu } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -31,9 +31,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <h1 className="logo">mony</h1>
-          <button onClick={() => setIsSidebarOpen(false)} className="icon-button mobile-only">
-            <X size={24} />
-          </button>
         </div>
         <nav className="nav">
           {navItems.map((item) => (

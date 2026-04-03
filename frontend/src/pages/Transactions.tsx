@@ -155,7 +155,7 @@ const Transactions: React.FC = () => {
               onChange={handleSearchChange}
               className="search-input"
             />
-            <button type="submit" className="button primary">
+            <button type="submit" className="button primary search-submit">
               Search
             </button>
           </form>
@@ -361,18 +361,22 @@ const Transactions: React.FC = () => {
           background: white;
           border: 1px solid var(--border-color);
           border-radius: 0.5rem;
-          padding: 0 0.75rem;
+          padding-left: 0.75rem;
           gap: 0.5rem;
+          min-height: 2.75rem;
+          overflow: hidden;
         }
         .search-icon {
           color: var(--text-muted);
+          flex-shrink: 0;
         }
         .search-input {
           border: none;
-          padding: 0.625rem 0;
+          padding: 0;
           outline: none;
           font-size: 0.875rem;
           width: 200px;
+          align-self: stretch;
         }
         .card {
           background: white;
@@ -436,6 +440,13 @@ const Transactions: React.FC = () => {
         }
         .button.primary:hover {
           background: var(--primary-hover);
+        }
+        .search-submit {
+          align-self: stretch;
+          border-radius: 0;
+          min-height: 2.75rem;
+          padding-left: 1rem;
+          padding-right: 1rem;
         }
         .button.secondary {
           background: white;
@@ -563,6 +574,9 @@ const Transactions: React.FC = () => {
           }
           .search-input {
             width: 100%;
+          }
+          .search-submit {
+            flex-shrink: 0;
           }
           .summary-grid {
             grid-template-columns: 1fr;
