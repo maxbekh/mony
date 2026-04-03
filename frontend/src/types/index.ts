@@ -41,10 +41,14 @@ export interface TransactionListParams {
   amount_max?: number;
   currency?: string;
   search?: string;
+  uncategorized_only?: boolean;
+  sort_by?: 'date' | 'amount' | 'category' | 'description';
+  sort_direction?: 'asc' | 'desc';
 }
 
 export interface TransactionUpdateParams {
   category_key?: string | null;
+  description?: string;
   metadata?: Record<string, JsonValue> | null;
 }
 
@@ -53,6 +57,29 @@ export interface ImportResponse {
   row_count: number;
   inserted_transactions: number;
   skipped_duplicates: number;
+  message: string;
+}
+
+export interface ImportBatch {
+  id: string;
+  source_name: string;
+  source_account_ref: string;
+  original_filename: string;
+  status: string;
+  row_count: number;
+  imported_at: string;
+  created_at: string;
+  transaction_count: number;
+}
+
+export interface ImportBatchListResponse {
+  items: ImportBatch[];
+}
+
+export interface DeleteImportResponse {
+  batch_id: string;
+  deleted_transactions: number;
+  deleted_rows: number;
   message: string;
 }
 
@@ -66,6 +93,11 @@ export interface SpendingByCategory {
   total_amount_minor: number;
   currency: string;
   transaction_count: number;
+}
+
+export interface AnalyticsQueryParams {
+  date_from?: string;
+  date_to?: string;
 }
 
 export interface AnalyticsResponse {

@@ -4,6 +4,8 @@ use serde_json::Value;
 use sqlx::{FromRow, PgPool, QueryBuilder};
 use uuid::Uuid;
 
+use crate::categories::is_valid_category_key;
+
 #[derive(Debug, Deserialize)]
 pub struct TransactionListParams {
     pub limit: Option<u32>,
@@ -17,6 +19,9 @@ pub struct TransactionListParams {
     pub amount_max: Option<i64>,
     pub currency: Option<String>,
     pub search: Option<String>,
+    pub uncategorized_only: Option<bool>,
+    pub sort_by: Option<String>,
+    pub sort_direction: Option<String>,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -46,7 +51,8 @@ pub struct TransactionListResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct TransactionUpdateParams {
-    pub category_key: Option<String>,
+    pub category_key: Option<Value>,
+    pub description: Option<Value>,
     pub metadata: Option<serde_json::Value>,
 }
 
@@ -108,6 +114,9 @@ impl TransactionListParams {
             amount_max,
             currency,
             search: normalize_optional(self.search),
+            uncategorized_only: self.uncategorized_only.unwrap_or(false),
+            sort_by: normalize_sort_by(self.sort_by)?,
+            sort_direction: normalize_sort_direction(self.sort_direction)?,
         })
     }
 }
@@ -125,6 +134,23 @@ pub struct NormalizedTransactionListParams {
     pub amount_max: Option<i64>,
     pub currency: Option<String>,
     pub search: Option<String>,
+    pub uncategorized_only: bool,
+    pub sort_by: TransactionSortBy,
+    pub sort_direction: SortDirection,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransactionSortBy {
+    Date,
+    Amount,
+    Category,
+    Description,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortDirection {
+    Asc,
+    Desc,
 }
 
 fn normalize_optional(value: Option<String>) -> Option<String> {
@@ -149,6 +175,36 @@ fn normalize_currency(value: Option<String>) -> Result<Option<String>, Transacti
     }
 
     Ok(Some(normalized))
+}
+
+fn normalize_sort_by(value: Option<String>) -> Result<TransactionSortBy, TransactionListError> {
+    let Some(value) = normalize_optional(value) else {
+        return Ok(TransactionSortBy::Date);
+    };
+
+    match value.as_str() {
+        "date" => Ok(TransactionSortBy::Date),
+        "amount" => Ok(TransactionSortBy::Amount),
+        "category" => Ok(TransactionSortBy::Category),
+        "description" => Ok(TransactionSortBy::Description),
+        _ => Err(TransactionListError::Validation(
+            "sort_by must be one of: date, amount, category, description".to_string(),
+        )),
+    }
+}
+
+fn normalize_sort_direction(value: Option<String>) -> Result<SortDirection, TransactionListError> {
+    let Some(value) = normalize_optional(value) else {
+        return Ok(SortDirection::Desc);
+    };
+
+    match value.to_ascii_lowercase().as_str() {
+        "asc" => Ok(SortDirection::Asc),
+        "desc" => Ok(SortDirection::Desc),
+        _ => Err(TransactionListError::Validation(
+            "sort_direction must be one of: asc, desc".to_string(),
+        )),
+    }
 }
 
 pub async fn list_transactions(
@@ -186,7 +242,8 @@ pub async fn list_transactions(
     let mut has_where = false;
     apply_filters_internal(&mut query, &params, &mut has_where);
 
-    query.push(" ORDER BY transaction_date DESC, created_at DESC");
+    query.push(" ORDER BY ");
+    push_order_by(&mut query, &params);
     query.push(" LIMIT ");
     query.push_bind(i64::from(params.limit));
     query.push(" OFFSET ");
@@ -204,6 +261,25 @@ pub async fn list_transactions(
         offset: params.offset,
         total_count,
     })
+}
+
+fn push_order_by(
+    query: &mut QueryBuilder<'_, sqlx::Postgres>,
+    params: &NormalizedTransactionListParams,
+) {
+    match params.sort_by {
+        TransactionSortBy::Date => query.push("transaction_date"),
+        TransactionSortBy::Amount => query.push("amount_minor"),
+        TransactionSortBy::Category => query.push("COALESCE(category_key, '')"),
+        TransactionSortBy::Description => query.push("LOWER(description)"),
+    };
+
+    match params.sort_direction {
+        SortDirection::Asc => query.push(" ASC"),
+        SortDirection::Desc => query.push(" DESC"),
+    };
+
+    query.push(", transaction_date DESC, created_at DESC");
 }
 
 fn apply_filters_internal<'a>(
@@ -255,6 +331,10 @@ fn apply_filters_internal<'a>(
         push_filter(query, has_where_clause, "description ILIKE ");
         query.push_bind(format!("%{search}%"));
     }
+
+    if params.uncategorized_only {
+        push_filter(query, has_where_clause, "category_key IS NULL");
+    }
 }
 
 pub async fn get_transaction(
@@ -294,10 +374,19 @@ pub async fn update_transaction(
 
     let mut has_update = false;
 
-    if let Some(category_key) = params.category_key {
-        let normalized = normalize_optional(Some(category_key));
+    if let Some(category_key) = normalize_category_update(params.category_key)? {
         query.push("category_key = ");
-        query.push_bind(normalized);
+        query.push_bind(category_key);
+        has_update = true;
+    }
+
+    if let Some(description) = normalize_description_update(params.description)? {
+        if has_update {
+            query.push(", ");
+        }
+
+        query.push("description = ");
+        query.push_bind(description);
         has_update = true;
     }
 
@@ -363,6 +452,52 @@ fn normalize_metadata_update(
     }
 }
 
+fn normalize_category_update(
+    category_key: Option<Value>,
+) -> Result<Option<Option<String>>, TransactionUpdateError> {
+    match category_key {
+        None => Ok(None),
+        Some(Value::Null) => Ok(Some(None)),
+        Some(Value::String(category_key)) => {
+            let normalized = normalize_optional(Some(category_key));
+
+            match normalized {
+                None => Ok(Some(None)),
+                Some(category_key) => {
+                    if !is_valid_category_key(&category_key) {
+                        return Err(TransactionUpdateError::Validation(
+                            "category_key must reference a known category".to_string(),
+                        ));
+                    }
+
+                    Ok(Some(Some(category_key)))
+                }
+            }
+        }
+        Some(_) => Err(TransactionUpdateError::Validation(
+            "category_key must be a string or null".to_string(),
+        )),
+    }
+}
+
+fn normalize_description_update(
+    description: Option<Value>,
+) -> Result<Option<String>, TransactionUpdateError> {
+    match description {
+        None => Ok(None),
+        Some(Value::String(description)) => {
+            let normalized = normalize_optional(Some(description)).ok_or(
+                TransactionUpdateError::Validation("description must not be empty".to_string()),
+            )?;
+
+            Ok(Some(normalized))
+        }
+        Some(_) => Err(TransactionUpdateError::Validation(
+            "description must be a string".to_string(),
+        )),
+    }
+}
+
 fn push_filter<'a>(
     query: &mut QueryBuilder<'a, sqlx::Postgres>,
     has_where_clause: &mut bool,
@@ -381,11 +516,12 @@ fn push_filter<'a>(
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     use super::{
-        normalize_metadata_update, MetadataUpdate, NormalizedTransactionListParams,
-        TransactionListError, TransactionListParams,
+        normalize_category_update, normalize_description_update, normalize_metadata_update,
+        MetadataUpdate, NormalizedTransactionListParams, SortDirection, TransactionListError,
+        TransactionListParams, TransactionSortBy, TransactionUpdateError,
     };
 
     #[test]
@@ -402,6 +538,9 @@ mod tests {
             amount_max: None,
             currency: None,
             search: Some(" groceries ".to_owned()),
+            uncategorized_only: Some(true),
+            sort_by: Some("amount".to_owned()),
+            sort_direction: Some("asc".to_owned()),
         };
 
         assert_eq!(
@@ -418,6 +557,9 @@ mod tests {
                 amount_max: None,
                 currency: None,
                 search: Some("groceries".to_owned()),
+                uncategorized_only: true,
+                sort_by: TransactionSortBy::Amount,
+                sort_direction: SortDirection::Asc,
             }
         );
     }
@@ -436,6 +578,9 @@ mod tests {
             amount_max: None,
             currency: None,
             search: None,
+            uncategorized_only: None,
+            sort_by: None,
+            sort_direction: None,
         };
 
         let normalized = params.normalized().expect("params should normalize");
@@ -458,6 +603,9 @@ mod tests {
             amount_max: None,
             currency: Some(" eur ".to_string()),
             search: None,
+            uncategorized_only: None,
+            sort_by: None,
+            sort_direction: None,
         };
 
         let normalized = params.normalized().expect("params should normalize");
@@ -479,6 +627,9 @@ mod tests {
             amount_max: None,
             currency: None,
             search: None,
+            uncategorized_only: None,
+            sort_by: None,
+            sort_direction: None,
         };
 
         let error = params
@@ -508,6 +659,9 @@ mod tests {
             amount_max: Some(100),
             currency: None,
             search: None,
+            uncategorized_only: None,
+            sort_by: None,
+            sort_direction: None,
         };
 
         let error = params
@@ -537,6 +691,9 @@ mod tests {
             amount_max: None,
             currency: Some("EURO".to_string()),
             search: None,
+            uncategorized_only: None,
+            sort_by: None,
+            sort_direction: None,
         };
 
         let error = params
@@ -547,6 +704,70 @@ mod tests {
             error.to_string(),
             TransactionListError::Validation("currency must be a 3-letter ISO code".to_string())
                 .to_string()
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_sort_fields() {
+        let params = TransactionListParams {
+            limit: None,
+            offset: None,
+            source_name: None,
+            source_account_ref: None,
+            category_key: None,
+            date_from: None,
+            date_to: None,
+            amount_min: None,
+            amount_max: None,
+            currency: None,
+            search: None,
+            uncategorized_only: None,
+            sort_by: Some("created_at".to_string()),
+            sort_direction: None,
+        };
+
+        let error = params
+            .normalized()
+            .expect_err("sort field should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            TransactionListError::Validation(
+                "sort_by must be one of: date, amount, category, description".to_string()
+            )
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_sort_directions() {
+        let params = TransactionListParams {
+            limit: None,
+            offset: None,
+            source_name: None,
+            source_account_ref: None,
+            category_key: None,
+            date_from: None,
+            date_to: None,
+            amount_min: None,
+            amount_max: None,
+            currency: None,
+            search: None,
+            uncategorized_only: None,
+            sort_by: None,
+            sort_direction: Some("sideways".to_string()),
+        };
+
+        let error = params
+            .normalized()
+            .expect_err("sort direction should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            TransactionListError::Validation(
+                "sort_direction must be one of: asc, desc".to_string()
+            )
+            .to_string()
         );
     }
 
@@ -590,6 +811,52 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "validation error: metadata must be a JSON object or null"
+        );
+    }
+
+    #[test]
+    fn accepts_known_category_keys_and_null_reset() {
+        assert_eq!(
+            normalize_category_update(Some(json!("food.grocery"))).unwrap(),
+            Some(Some("food.grocery".to_string()))
+        );
+        assert_eq!(
+            normalize_category_update(Some(Value::Null)).unwrap(),
+            Some(None)
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_category_keys() {
+        let error = normalize_category_update(Some(json!("unknown.category")))
+            .expect_err("unknown category should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            TransactionUpdateError::Validation(
+                "category_key must reference a known category".to_string()
+            )
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn normalizes_trimmed_description_updates() {
+        assert_eq!(
+            normalize_description_update(Some(json!("  Grocery run  "))).unwrap(),
+            Some("Grocery run".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_empty_description_updates() {
+        let error = normalize_description_update(Some(json!("   ")))
+            .expect_err("empty description should be rejected");
+
+        assert_eq!(
+            error.to_string(),
+            TransactionUpdateError::Validation("description must not be empty".to_string())
+                .to_string()
         );
     }
 }

@@ -1,7 +1,8 @@
-use std::error::Error;
+use std::{env, error::Error};
 
 use mony_backend::{
-    app::build_router, config::AppConfig, db::connect_and_migrate, state::AppState,
+    app::build_router, categorization::reapply_category_rules, config::AppConfig,
+    db::connect_and_migrate, state::AppState,
 };
 use tokio::{net::TcpListener, signal};
 use tracing::info;
@@ -13,8 +14,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
     init_tracing();
 
     let config = AppConfig::from_env()?;
-    let address = config.address();
     let pool = connect_and_migrate(&config.database).await?;
+
+    if matches!(env::args().nth(1).as_deref(), Some("recategorize")) {
+        let summary = reapply_category_rules(&pool).await?;
+        info!(
+            scanned_transactions = summary.scanned_transactions,
+            filled_uncategorized = summary.filled_uncategorized,
+            repaired_legacy_salary = summary.repaired_legacy_salary,
+            cleared_legacy_salary = summary.cleared_legacy_salary,
+            refined_finance_transfer = summary.refined_finance_transfer,
+            corrected_existing_categories = summary.corrected_existing_categories,
+            "reapplied category rules"
+        );
+        return Ok(());
+    }
+
+    let address = config.address();
     let listener = TcpListener::bind(&address).await?;
     let state = AppState { db: pool };
 

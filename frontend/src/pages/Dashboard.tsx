@@ -1,68 +1,186 @@
 import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { CalendarRange, PieChart, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import type { SpendingByCategory } from '../types';
-import { PieChart, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import type { AnalyticsQueryParams, Category, SpendingByCategory } from '../types';
+
+type PeriodKey = '30d' | '90d' | '12m' | 'all';
+
+const PERIOD_OPTIONS: Array<{ key: PeriodKey; label: string; description: string }> = [
+  { key: '30d', label: '30 days', description: 'Recent monthly view' },
+  { key: '90d', label: '90 days', description: 'Quarterly view' },
+  { key: '12m', label: '12 months', description: 'Rolling year' },
+  { key: 'all', label: 'All time', description: 'Full imported history' },
+];
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (axios.isAxiosError(error)) {
+    const payload = error.response?.data;
+    if (typeof payload === 'string' && payload.trim() !== '') {
+      return payload;
+    }
+  }
+
+  if (error instanceof Error && error.message.trim() !== '') {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function formatDateInput(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildAnalyticsParams(period: PeriodKey): AnalyticsQueryParams {
+  if (period === 'all') {
+    return {};
+  }
+
+  const today = new Date();
+  const start = new Date(today);
+
+  if (period === '30d') {
+    start.setDate(today.getDate() - 29);
+  } else if (period === '90d') {
+    start.setDate(today.getDate() - 89);
+  } else {
+    start.setFullYear(today.getFullYear() - 1);
+    start.setDate(today.getDate() + 1);
+  }
+
+  return {
+    date_from: formatDateInput(start),
+    date_to: formatDateInput(today),
+  };
+}
 
 const Dashboard: React.FC = () => {
+  const [period, setPeriod] = useState<PeriodKey>('30d');
   const [analytics, setAnalytics] = useState<SpendingByCategory[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
+    void (async () => {
+      setLoading(true);
+      setError(null);
+
       try {
-        const data = await api.getAnalyticsSpending();
+        const [data, categoryData] = await Promise.all([
+          api.getAnalyticsSpending(buildAnalyticsParams(period)),
+          api.getCategories(),
+        ]);
         setAnalytics(data.spending_by_category);
-      } catch (error) {
-        console.error('Failed to fetch analytics:', error);
+        setCategories(categoryData);
+      } catch (fetchError) {
+        setError(getErrorMessage(fetchError, 'Failed to fetch dashboard data.'));
       } finally {
         setLoading(false);
       }
-    };
-    fetchAnalytics();
-  }, []);
+    })();
+  }, [period]);
 
-  const totalSpending = analytics.reduce((acc, curr) => {
-    return curr.total_amount_minor < 0 ? acc + Math.abs(curr.total_amount_minor) : acc;
+  const totalSpending = analytics.reduce((accumulator, item) => {
+    return item.total_amount_minor < 0
+      ? accumulator + Math.abs(item.total_amount_minor)
+      : accumulator;
   }, 0);
 
-  const totalIncome = analytics.reduce((acc, curr) => {
-    return curr.total_amount_minor > 0 ? acc + curr.total_amount_minor : acc;
+  const totalIncome = analytics.reduce((accumulator, item) => {
+    return item.total_amount_minor > 0
+      ? accumulator + item.total_amount_minor
+      : accumulator;
   }, 0);
 
-  const formatAmount = (amount_minor: number) => {
-    return new Intl.NumberFormat('en-US', {
+  const spendingCategories = analytics
+    .filter((item) => item.total_amount_minor < 0)
+    .sort((left, right) => left.total_amount_minor - right.total_amount_minor);
+
+  const topCategories = spendingCategories.slice(0, 5);
+  const uncategorizedSpending = spendingCategories
+    .filter((item) => item.category_key === null)
+    .reduce((accumulator, item) => accumulator + Math.abs(item.total_amount_minor), 0);
+
+  const formatAmount = (amountMinor: number, currency = 'EUR') =>
+    new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'EUR',
-    }).format(amount_minor / 100);
-  };
+      currency,
+    }).format(amountMinor / 100);
+
+  const categoryLabels = new Map(categories.map((category) => [category.key, category.label]));
+  const getCategoryLabel = (categoryKey: string | null) =>
+    categoryKey ? categoryLabels.get(categoryKey) ?? categoryKey : 'Uncategorized';
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Dashboard</h1>
-        <p className="text-muted">Overview of your financial activity.</p>
+        <div>
+          <h1>Dashboard</h1>
+          <p className="text-muted">Short-range overview of your financial activity.</p>
+        </div>
+
+        <div className="header-actions">
+          <div className="period-selector" aria-label="Select dashboard period">
+            {PERIOD_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                className={`period-chip ${period === option.key ? 'active' : ''}`}
+                onClick={() => setPeriod(option.key)}
+                title={option.description}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <Link to="/analytics" className="analytics-link">
+            Open analytics
+          </Link>
+        </div>
       </div>
+
+      {error && <div className="notice error">{error}</div>}
 
       <div className="stats-grid">
         <div className="card stat-card income">
-          <div className="stat-icon"><TrendingUp size={24} /></div>
+          <div className="stat-icon">
+            <TrendingUp size={24} />
+          </div>
           <div className="stat-content">
-            <span className="stat-label">Total Income</span>
+            <span className="stat-label">Income</span>
             <span className="stat-value">{formatAmount(totalIncome)}</span>
           </div>
         </div>
         <div className="card stat-card spending">
-          <div className="stat-icon"><TrendingDown size={24} /></div>
+          <div className="stat-icon">
+            <TrendingDown size={24} />
+          </div>
           <div className="stat-content">
-            <span className="stat-label">Total Spending</span>
+            <span className="stat-label">Spending</span>
             <span className="stat-value">{formatAmount(totalSpending)}</span>
           </div>
         </div>
         <div className="card stat-card balance">
-          <div className="stat-icon"><Wallet size={24} /></div>
+          <div className="stat-icon">
+            <Wallet size={24} />
+          </div>
           <div className="stat-content">
-            <span className="stat-label">Net Balance</span>
+            <span className="stat-label">Net</span>
             <span className="stat-value">{formatAmount(totalIncome - totalSpending)}</span>
+          </div>
+        </div>
+        <div className="card stat-card context">
+          <div className="stat-icon">
+            <CalendarRange size={24} />
+          </div>
+          <div className="stat-content">
+            <span className="stat-label">Window</span>
+            <span className="stat-value stat-value-small">
+              {PERIOD_OPTIONS.find((option) => option.key === period)?.label}
+            </span>
           </div>
         </div>
       </div>
@@ -71,40 +189,76 @@ const Dashboard: React.FC = () => {
         <div className="card">
           <div className="card-header">
             <PieChart size={20} />
-            <h2>Spending by Category</h2>
+            <h2>Top spending categories</h2>
           </div>
           <div className="card-body">
             {loading ? (
-              <p className="text-center py-8">Loading analytics...</p>
-            ) : analytics.length === 0 ? (
-              <p className="text-center py-8">No data available. Try importing some transactions.</p>
+              <p className="text-center py-8">Loading dashboard...</p>
+            ) : spendingCategories.length === 0 ? (
+              <p className="text-center py-8">No spending data for this period.</p>
             ) : (
               <div className="category-list">
-                {analytics
-                  .filter(a => a.total_amount_minor < 0)
-                  .sort((a, b) => a.total_amount_minor - b.total_amount_minor)
-                  .map((item) => {
-                    const percentage = (Math.abs(item.total_amount_minor) / totalSpending) * 100;
-                    return (
+                {topCategories.map((item) => {
+                  const percentage =
+                    totalSpending === 0 ? 0 : (Math.abs(item.total_amount_minor) / totalSpending) * 100;
+
+                  return (
                       <div key={item.category_key || 'other'} className="category-item">
-                        <div className="category-info">
-                          <span className="category-name">{item.category_key || 'Uncategorized'}</span>
-                          <span className="category-amount">{formatAmount(Math.abs(item.total_amount_minor))}</span>
-                        </div>
-                        <div className="progress-bar">
-                          <div 
-                            className="progress-fill" 
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                        </div>
-                        <div className="category-meta">
-                          <span>{item.transaction_count} transactions</span>
-                          <span>{percentage.toFixed(1)}%</span>
-                        </div>
+                      <div className="category-info">
+                        <span className="category-name">{getCategoryLabel(item.category_key)}</span>
+                        <span className="category-amount">
+                          {formatAmount(Math.abs(item.total_amount_minor), item.currency)}
+                        </span>
                       </div>
-                    );
-                  })}
+                      <div className="progress-bar">
+                        <div className="progress-fill" style={{ width: `${percentage}%` }} />
+                      </div>
+                      <div className="category-meta">
+                        <span>{item.transaction_count} transactions</span>
+                        <span>{percentage.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            )}
+          </div>
+        </div>
+
+        <div className="card insight-card">
+          <div className="card-header">
+            <Wallet size={20} />
+            <h2>Snapshot</h2>
+          </div>
+          <div className="card-body insight-body">
+            {loading ? (
+              <p className="text-center py-8">Calculating summary...</p>
+            ) : (
+              <>
+                <div className="insight-row">
+                  <span>Tracked categories</span>
+                  <strong>{spendingCategories.length}</strong>
+                </div>
+                <div className="insight-row">
+                  <span>Uncategorized spending</span>
+                  <strong>{formatAmount(uncategorizedSpending)}</strong>
+                </div>
+                <div className="insight-row">
+                  <span>Largest category share</span>
+                  <strong>
+                    {topCategories.length === 0 || totalSpending === 0
+                      ? '0.0%'
+                      : `${(
+                          (Math.abs(topCategories[0].total_amount_minor) / totalSpending) *
+                          100
+                        ).toFixed(1)}%`}
+                  </strong>
+                </div>
+                <div className="insight-row">
+                  <span>Largest category</span>
+                  <strong>{topCategories[0] ? getCategoryLabel(topCategories[0].category_key) : 'None'}</strong>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -116,9 +270,65 @@ const Dashboard: React.FC = () => {
           flex-direction: column;
           gap: 2rem;
         }
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        .period-selector {
+          display: flex;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+        .period-chip {
+          border: 1px solid var(--border-color);
+          background: white;
+          border-radius: 999px;
+          padding: 0.55rem 0.9rem;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .period-chip.active {
+          background: var(--primary-color);
+          border-color: var(--primary-color);
+          color: white;
+        }
+        .analytics-link {
+          display: inline-flex;
+          align-items: center;
+          min-height: 2.5rem;
+          padding: 0 0.95rem;
+          border-radius: 999px;
+          border: 1px solid var(--border-color);
+          background: white;
+          color: var(--text-main);
+          text-decoration: none;
+          font-size: 0.875rem;
+          font-weight: 500;
+        }
+        .notice {
+          padding: 0.875rem 1rem;
+          border-radius: 0.75rem;
+          border: 1px solid;
+        }
+        .notice.error {
+          background: #fef2f2;
+          border-color: #fca5a5;
+          color: #991b1b;
+        }
         .stats-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
           gap: 1.5rem;
         }
         .stat-card {
@@ -126,6 +336,9 @@ const Dashboard: React.FC = () => {
           display: flex;
           align-items: center;
           gap: 1.25rem;
+          background: white;
+          border: 1px solid var(--border-color);
+          border-radius: 0.75rem;
         }
         .stat-icon {
           width: 3rem;
@@ -138,9 +351,11 @@ const Dashboard: React.FC = () => {
         .income .stat-icon { background: #f0fdf4; color: #166534; }
         .spending .stat-icon { background: #fef2f2; color: #991b1b; }
         .balance .stat-icon { background: #eff6ff; color: #1e40af; }
+        .context .stat-icon { background: #f8fafc; color: #334155; }
         .stat-content {
           display: flex;
           flex-direction: column;
+          min-width: 0;
         }
         .stat-label {
           font-size: 0.875rem;
@@ -152,10 +367,19 @@ const Dashboard: React.FC = () => {
           font-weight: 700;
           color: var(--text-main);
         }
+        .stat-value-small {
+          font-size: 1.1rem;
+        }
         .dashboard-grid {
           display: grid;
-          grid-template-columns: 1fr;
+          grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
           gap: 1.5rem;
+        }
+        .card {
+          background: white;
+          border: 1px solid var(--border-color);
+          border-radius: 0.75rem;
+          overflow: hidden;
         }
         .card-header {
           padding: 1.25rem 1.5rem;
@@ -184,8 +408,13 @@ const Dashboard: React.FC = () => {
         .category-info {
           display: flex;
           justify-content: space-between;
+          gap: 1rem;
           font-weight: 600;
           font-size: 0.875rem;
+        }
+        .category-name,
+        .category-amount {
+          min-width: 0;
         }
         .progress-bar {
           height: 0.5rem;
@@ -203,6 +432,30 @@ const Dashboard: React.FC = () => {
           justify-content: space-between;
           font-size: 0.75rem;
           color: var(--text-muted);
+        }
+        .insight-body {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        .insight-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 1rem;
+          padding-bottom: 0.875rem;
+          border-bottom: 1px solid #eef2f7;
+        }
+        .insight-row:last-child {
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+        .text-center { text-align: center; }
+        .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+        .text-muted { color: var(--text-muted); }
+        @media (max-width: 960px) {
+          .dashboard-grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </div>

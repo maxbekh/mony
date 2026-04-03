@@ -73,7 +73,11 @@ pub fn parse_csv(content: &[u8]) -> Result<Vec<RawRow>, IngestionError> {
         .map(|h| String::from_utf8_lossy(h).trim().to_string())
         .collect();
 
-    tracing::info!(?headers, delimiter = (delimiter as char).to_string(), "parsed csv headers");
+    tracing::info!(
+        ?headers,
+        delimiter = (delimiter as char).to_string(),
+        "parsed csv headers"
+    );
 
     let mut rows = Vec::new();
     let mut byte_record = csv::ByteRecord::new();
@@ -82,7 +86,7 @@ pub fn parse_csv(content: &[u8]) -> Result<Vec<RawRow>, IngestionError> {
     while rdr.read_byte_record(&mut byte_record)? {
         index += 1;
         let mut record_map = BTreeMap::new();
-        
+
         let mut has_any_value = false;
         for (i, value) in byte_record.iter().enumerate() {
             if let Some(header) = headers.get(i) {
@@ -98,7 +102,8 @@ pub fn parse_csv(content: &[u8]) -> Result<Vec<RawRow>, IngestionError> {
             continue;
         }
 
-        let raw_record_json = serde_json::to_value(&record_map).expect("csv row should serialize to json");
+        let raw_record_json =
+            serde_json::to_value(&record_map).expect("csv row should serialize to json");
         let raw_hash = hex::encode(Sha256::digest(raw_record_json.to_string().as_bytes()));
 
         rows.push(RawRow {
@@ -218,7 +223,7 @@ fn normalize_for_match(s: &str) -> String {
 
 fn try_get_field<'a>(record: &'a serde_json::Value, keys: &[&str]) -> Option<&'a str> {
     let obj = record.as_object()?;
-    
+
     // Normalize target keys
     let normalized_targets: Vec<String> = keys.iter().map(|k| normalize_for_match(k)).collect();
 
@@ -269,8 +274,10 @@ fn normalize_row(
     let amount_minor = if let Some(a) = try_get_field(record, &["amount"]) {
         parse_minor_units(a)?
     } else {
-        let debit = try_get_field(record, &["debit", "débit"]).and_then(|v| parse_minor_units(v).ok());
-        let credit = try_get_field(record, &["credit", "crédit"]).and_then(|v| parse_minor_units(v).ok());
+        let debit =
+            try_get_field(record, &["debit", "débit"]).and_then(|v| parse_minor_units(v).ok());
+        let credit =
+            try_get_field(record, &["credit", "crédit"]).and_then(|v| parse_minor_units(v).ok());
 
         match (debit, credit) {
             (Some(d), _) => -d.abs(), // Debit is always negative
@@ -289,8 +296,9 @@ fn normalize_row(
         .ok_or(IngestionError::MissingField("description/Libellé"))?
         .to_owned();
 
-    let external_reference = try_get_field(record, &["external_reference", "reference", "référence"])
-        .map(|s| s.to_owned());
+    let external_reference =
+        try_get_field(record, &["external_reference", "reference", "référence"])
+            .map(|s| s.to_owned());
 
     let category_key = crate::categories::auto_categorize(&description);
 
@@ -489,7 +497,10 @@ mod tests {
         });
 
         let normalized = normalize_row("cic", "acc1", &record).unwrap();
-        assert_eq!(normalized.transaction_date, NaiveDate::from_ymd_opt(2023, 4, 5).unwrap());
+        assert_eq!(
+            normalized.transaction_date,
+            NaiveDate::from_ymd_opt(2023, 4, 5).unwrap()
+        );
         assert_eq!(normalized.amount_minor, 9400);
         assert_eq!(normalized.description, "VIR CAF blabla");
     }

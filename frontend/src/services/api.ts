@@ -6,6 +6,9 @@ import type {
   TransactionListParams,
   TransactionUpdateParams,
   ImportResponse,
+  ImportBatchListResponse,
+  DeleteImportResponse,
+  AnalyticsQueryParams,
   AnalyticsResponse,
   StatusPayload,
 } from '../types';
@@ -45,8 +48,10 @@ export const api = {
     return data;
   },
 
-  getAnalyticsSpending: async () => {
-    const { data } = await client.get<AnalyticsResponse>('/v1/analytics/spending-by-category');
+  getAnalyticsSpending: async (params: AnalyticsQueryParams = {}) => {
+    const { data } = await client.get<AnalyticsResponse>('/v1/analytics/spending-by-category', {
+      params,
+    });
     return data;
   },
 
@@ -66,6 +71,16 @@ export const api = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return data;
+  },
+
+  listImports: async () => {
+    const { data } = await client.get<ImportBatchListResponse>('/v1/imports');
+    return data;
+  },
+
+  deleteImport: async (id: string) => {
+    const { data } = await client.delete<DeleteImportResponse>(`/v1/imports/${id}`);
     return data;
   },
 };

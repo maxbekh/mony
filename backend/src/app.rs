@@ -1,7 +1,7 @@
 use axum::{
     extract::{Multipart, Path, Query, State},
     http::StatusCode,
-    routing::{get, patch, post},
+    routing::{delete, get, patch, post},
     Json, Router,
 };
 use serde::Serialize;
@@ -9,8 +9,12 @@ use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    analytics::{get_spending_by_category, AnalyticsResponse},
+    analytics::{get_spending_by_category, AnalyticsError, AnalyticsParams, AnalyticsResponse},
     categories::{list_categories, Category},
+    imports::{
+        delete_import, list_imports, DeleteImportResponse, ImportBatchListResponse,
+        ImportManagementError,
+    },
     ingestion::ingest_csv,
     state::AppState,
     transactions::{
@@ -39,7 +43,8 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
-        .route("/v1/imports", post(import_csv))
+        .route("/v1/imports", post(import_csv).get(get_imports))
+        .route("/v1/imports/{id}", delete(delete_import_batch))
         .route("/v1/transactions", get(get_transactions))
         .route("/v1/transactions/{id}", get(get_transaction_by_id))
         .route("/v1/transactions/{id}", patch(patch_transaction))
@@ -54,10 +59,11 @@ pub fn build_router(state: AppState) -> Router {
 
 async fn get_analytics_spending(
     State(state): State<AppState>,
+    Query(params): Query<AnalyticsParams>,
 ) -> Result<Json<AnalyticsResponse>, (StatusCode, String)> {
-    let response = get_spending_by_category(&state.db)
+    let response = get_spending_by_category(&state.db, params)
         .await
-        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+        .map_err(map_analytics_error)?;
 
     Ok(Json(response))
 }
@@ -155,6 +161,28 @@ async fn import_csv(
     ))
 }
 
+async fn get_imports(
+    State(state): State<AppState>,
+) -> Result<Json<ImportBatchListResponse>, (StatusCode, String)> {
+    let response = list_imports(&state.db)
+        .await
+        .map_err(map_import_management_error)?;
+
+    Ok(Json(response))
+}
+
+async fn delete_import_batch(
+    State(state): State<AppState>,
+    Path(id): Path<uuid::Uuid>,
+) -> Result<Json<DeleteImportResponse>, (StatusCode, String)> {
+    let response = delete_import(&state.db, id)
+        .await
+        .map_err(map_import_management_error)?
+        .ok_or((StatusCode::NOT_FOUND, "Import not found".to_string()))?;
+
+    Ok(Json(response))
+}
+
 fn map_ingestion_error(error: crate::ingestion::IngestionError) -> (StatusCode, String) {
     match error {
         crate::ingestion::IngestionError::DuplicateFile(message) => (StatusCode::CONFLICT, message),
@@ -165,6 +193,21 @@ fn map_ingestion_error(error: crate::ingestion::IngestionError) -> (StatusCode, 
         crate::ingestion::IngestionError::Database(_) => {
             (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
         }
+    }
+}
+
+fn map_import_management_error(error: ImportManagementError) -> (StatusCode, String) {
+    match error {
+        ImportManagementError::Database(error) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+        }
+    }
+}
+
+fn map_analytics_error(error: AnalyticsError) -> (StatusCode, String) {
+    match error {
+        AnalyticsError::Validation(message) => (StatusCode::BAD_REQUEST, message),
+        AnalyticsError::Database(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
 }
 
