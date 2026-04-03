@@ -131,9 +131,13 @@ const Categorize: React.FC = () => {
         ) : (
           <div className="categorize-layout">
             <div className="transaction-card">
+              <div className="queue-progress">
+                <span>Card {index + 1}</span>
+                <span>{remaining} left</span>
+              </div>
               <div className="transaction-header">
                 <Tags size={20} />
-                <span>Transaction {index + 1}</span>
+                <span>Review transaction</span>
               </div>
               <div className="transaction-amount">
                 {formatAmount(current.amount_minor, current.currency)}
@@ -160,7 +164,12 @@ const Categorize: React.FC = () => {
 
             <div className="category-panel">
               <div className="panel-header">
-                <h2>Assign a category</h2>
+                <div>
+                  <h2>Assign a category</h2>
+                  <p className="text-muted panel-copy">
+                    Pick the best fit and move to the next card.
+                  </p>
+                </div>
                 <button type="button" className="button secondary" onClick={() => void goNext()}>
                   <SkipForward size={16} />
                   Skip
@@ -225,6 +234,15 @@ const Categorize: React.FC = () => {
           gap: 1rem;
           background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
         }
+        .queue-progress {
+          display: flex;
+          justify-content: space-between;
+          gap: 1rem;
+          color: var(--text-muted);
+          font-size: 0.78rem;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
         .transaction-header {
           display: flex;
           align-items: center;
@@ -268,6 +286,9 @@ const Categorize: React.FC = () => {
           justify-content: space-between;
           align-items: center;
           gap: 1rem;
+        }
+        .panel-copy {
+          margin-top: 0.2rem;
         }
         .category-grid {
           display: grid;
@@ -343,6 +364,68 @@ const Categorize: React.FC = () => {
           .transaction-card {
             border-right: none;
             border-bottom: 1px solid var(--border-color);
+          }
+        }
+        @media (max-width: 640px) {
+          .page {
+            gap: 1rem;
+          }
+          .page-header {
+            align-items: stretch;
+          }
+          .queue-meta {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+          }
+          .transaction-card {
+            padding: 1rem;
+            gap: 0.85rem;
+          }
+          .transaction-amount {
+            font-size: 2.3rem;
+            line-height: 1;
+          }
+          .transaction-description {
+            font-size: 1.2rem;
+          }
+          .transaction-details {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.6rem;
+            padding-top: 0;
+          }
+          .transaction-details > div {
+            padding: 0.7rem;
+            border-radius: 0.8rem;
+            background: white;
+            border: 1px solid var(--border-color);
+          }
+          .category-panel {
+            padding: 1rem;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+          }
+          .panel-header {
+            flex-direction: column;
+            align-items: stretch;
+          }
+          .panel-header .button {
+            width: 100%;
+            justify-content: center;
+          }
+          .category-grid {
+            grid-template-columns: 1fr;
+          }
+          .category-button {
+            min-height: 4.1rem;
+            justify-content: center;
+            gap: 0.2rem;
+            border-radius: 1rem;
+          }
+          .category-button-label {
+            font-size: 1rem;
+          }
+          .category-button-key {
+            font-size: 0.7rem;
           }
         }
       `}</style>

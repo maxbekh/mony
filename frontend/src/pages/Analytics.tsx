@@ -319,6 +319,37 @@ const Analytics: React.FC = () => {
             </tbody>
           </table>
         </div>
+        <div className="mobile-analytics-list">
+          {loading ? (
+            <div className="empty">Loading analytics...</div>
+          ) : analytics.length === 0 ? (
+            <div className="empty">No analytics data for this period.</div>
+          ) : (
+            analytics
+              .slice()
+              .sort((left, right) => Math.abs(right.total_amount_minor) - Math.abs(left.total_amount_minor))
+              .map((row) => (
+                <article
+                  key={`mobile-${row.category_key ?? 'uncategorized'}-${row.total_amount_minor}-${row.transaction_count}`}
+                  className="mobile-analytics-card"
+                >
+                  <div className="mobile-analytics-top">
+                    <div>
+                      <div className="table-category">{getCategoryLabel(row.category_key)}</div>
+                      {row.category_key && <div className="table-key">{row.category_key}</div>}
+                    </div>
+                    <strong className={row.total_amount_minor < 0 ? 'negative' : 'positive'}>
+                      {formatAmount(Math.abs(row.total_amount_minor), row.currency)}
+                    </strong>
+                  </div>
+                  <div className="mobile-analytics-meta">
+                    <span>{row.total_amount_minor < 0 ? 'Spending' : 'Income'}</span>
+                    <span>{row.transaction_count} transactions</span>
+                  </div>
+                </article>
+              ))
+          )}
+        </div>
       </div>
 
       <style>{`
@@ -391,6 +422,9 @@ const Analytics: React.FC = () => {
         }
         .apply-button {
           min-width: 6rem;
+        }
+        .table-card {
+          overflow: hidden;
         }
         .notice {
           padding: 0.875rem 1rem;
@@ -488,6 +522,31 @@ const Analytics: React.FC = () => {
         .table-scroll {
           overflow-x: auto;
         }
+        .mobile-analytics-list {
+          display: none;
+          padding: 1rem;
+          gap: 0.75rem;
+        }
+        .mobile-analytics-card {
+          display: flex;
+          flex-direction: column;
+          gap: 0.55rem;
+          padding: 0.95rem 1rem;
+          border: 1px solid var(--border-color);
+          border-radius: 0.9rem;
+          background: #fcfdff;
+        }
+        .mobile-analytics-top,
+        .mobile-analytics-meta {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 1rem;
+        }
+        .mobile-analytics-meta {
+          color: var(--text-muted);
+          font-size: 0.8rem;
+        }
         .table {
           width: 100%;
           border-collapse: collapse;
@@ -540,6 +599,23 @@ const Analytics: React.FC = () => {
         }
         @media (max-width: 720px) {
           .date-controls {
+            grid-template-columns: 1fr;
+          }
+          .preset-group {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            padding-bottom: 0.2rem;
+          }
+          .button.secondary {
+            white-space: nowrap;
+          }
+          .table-scroll {
+            display: none;
+          }
+          .mobile-analytics-list {
+            display: grid;
+          }
+          .stats-grid {
             grid-template-columns: 1fr;
           }
         }

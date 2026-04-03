@@ -246,6 +246,78 @@ const Transactions: React.FC = () => {
     }
   };
 
+  const renderCategoryControl = (transaction: Transaction) => {
+    if (inlineCategoryTransactionId === transaction.id) {
+      return (
+        <div className="inline-category-editor">
+          <div className="inline-category-header">
+            <span className="text-xs text-muted">Choose a category</span>
+            <button
+              type="button"
+              className="inline-close-button"
+              onClick={closeInlineCategoryEditor}
+              aria-label="Close category editor"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <select
+            value={transaction.category_key ?? ''}
+            onChange={(e) => void updateInlineCategory(transaction, e.target.value || null)}
+            className="inline-category-select"
+            disabled={inlineSavingTransactionId === transaction.id}
+            autoFocus
+          >
+            <option value="">Uncategorized</option>
+            {categories.map((category) => (
+              <option key={category.key} value={category.key}>
+                {category.label}
+              </option>
+            ))}
+          </select>
+          <div className="inline-category-actions">
+            <button
+              type="button"
+              className="inline-link-button"
+              onClick={() => void updateInlineCategory(transaction, null)}
+              disabled={
+                inlineSavingTransactionId === transaction.id || transaction.category_key === null
+              }
+            >
+              Clear
+            </button>
+            {inlineSavingTransactionId === transaction.id ? (
+              <span className="text-xs text-muted">Saving...</span>
+            ) : (
+              <span className="text-xs text-muted inline-save-hint">
+                <Check size={12} />
+                Save on select
+              </span>
+            )}
+          </div>
+          {inlineCategoryError && <div className="text-xs inline-error">{inlineCategoryError}</div>}
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <button
+          type="button"
+          className={`badge category-trigger ${transaction.category_key ? 'category' : 'uncategorized'}`}
+          onClick={() => openInlineCategoryEditor(transaction.id)}
+          aria-label={`Change category for ${transaction.description}`}
+        >
+          <span>{getCategoryLabel(transaction.category_key)}</span>
+          <ChevronDown size={14} />
+        </button>
+        {transaction.category_key && (
+          <div className="text-muted text-xs category-key">{transaction.category_key}</div>
+        )}
+      </>
+    );
+  };
+
   const formatAmount = (amountMinor: number, currency: string) =>
     new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -352,7 +424,7 @@ const Transactions: React.FC = () => {
 
       {pageError && <div className="notice error">{pageError}</div>}
 
-      <div className="card">
+      <div className="card table-shell">
         <table className="table">
           <thead>
             <tr>
@@ -388,80 +460,7 @@ const Transactions: React.FC = () => {
                     )}
                   </td>
                   <td className="category-cell">
-                    {inlineCategoryTransactionId === transaction.id ? (
-                      <div className="inline-category-editor">
-                        <div className="inline-category-header">
-                          <span className="text-xs text-muted">Choose a category</span>
-                          <button
-                            type="button"
-                            className="inline-close-button"
-                            onClick={closeInlineCategoryEditor}
-                            aria-label="Close category editor"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                        <select
-                          value={transaction.category_key ?? ''}
-                          onChange={(e) =>
-                            void updateInlineCategory(transaction, e.target.value || null)
-                          }
-                          className="inline-category-select"
-                          disabled={inlineSavingTransactionId === transaction.id}
-                          autoFocus
-                        >
-                          <option value="">Uncategorized</option>
-                          {categories.map((category) => (
-                            <option key={category.key} value={category.key}>
-                              {category.label}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="inline-category-actions">
-                          <button
-                            type="button"
-                            className="inline-link-button"
-                            onClick={() => void updateInlineCategory(transaction, null)}
-                            disabled={
-                              inlineSavingTransactionId === transaction.id ||
-                              transaction.category_key === null
-                            }
-                          >
-                            Clear
-                          </button>
-                          {inlineSavingTransactionId === transaction.id ? (
-                            <span className="text-xs text-muted">Saving...</span>
-                          ) : (
-                            <span className="text-xs text-muted inline-save-hint">
-                              <Check size={12} />
-                              Save on select
-                            </span>
-                          )}
-                        </div>
-                        {inlineCategoryError && (
-                          <div className="text-xs inline-error">{inlineCategoryError}</div>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className={`badge category-trigger ${
-                            transaction.category_key ? 'category' : 'uncategorized'
-                          }`}
-                          onClick={() => openInlineCategoryEditor(transaction.id)}
-                          aria-label={`Change category for ${transaction.description}`}
-                        >
-                          <span>{getCategoryLabel(transaction.category_key)}</span>
-                          <ChevronDown size={14} />
-                        </button>
-                        {transaction.category_key && (
-                          <div className="text-muted text-xs category-key">
-                            {transaction.category_key}
-                          </div>
-                        )}
-                      </>
-                    )}
+                    {renderCategoryControl(transaction)}
                   </td>
                   <td>
                     <div className="text-sm">{transaction.source_name}</div>
@@ -489,28 +488,72 @@ const Transactions: React.FC = () => {
             )}
           </tbody>
         </table>
+      </div>
 
-        <div className="pagination">
-          <div className="text-sm text-muted">
-            Showing {totalCount === 0 ? 0 : currentOffset + 1} to{' '}
-            {Math.min(currentOffset + currentLimit, totalCount)} of {totalCount} transactions
-          </div>
-          <div className="pagination-controls">
-            <button
-              onClick={prevPage}
-              disabled={currentOffset === 0 || loading}
-              className="icon-button"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              onClick={nextPage}
-              disabled={currentOffset + currentLimit >= totalCount || loading}
-              className="icon-button"
-            >
-              <ChevronRight size={20} />
-            </button>
-          </div>
+      <div className="mobile-transaction-list">
+        {loading ? (
+          <div className="mobile-empty card">Loading transactions...</div>
+        ) : transactions.length === 0 ? (
+          <div className="mobile-empty card">No transactions found.</div>
+        ) : (
+          transactions.map((transaction) => (
+            <article key={transaction.id} className="mobile-transaction-card">
+              <div className="mobile-transaction-top">
+                <div>
+                  <div className="mobile-transaction-date">{transaction.transaction_date}</div>
+                  <div className="transaction-description">{transaction.description}</div>
+                </div>
+                <div
+                  className={`mobile-amount ${
+                    transaction.amount_minor < 0 ? 'amount-negative' : 'amount-positive'
+                  }`}
+                >
+                  {formatAmount(transaction.amount_minor, transaction.currency)}
+                </div>
+              </div>
+              {transaction.external_reference && (
+                <div className="text-muted text-xs">{transaction.external_reference}</div>
+              )}
+              <div className="mobile-source-card">
+                <span>{transaction.source_name}</span>
+                <span className="text-muted">{transaction.source_account_ref}</span>
+              </div>
+              <div className="mobile-category-block">{renderCategoryControl(transaction)}</div>
+              <div className="mobile-card-actions">
+                <button
+                  type="button"
+                  className="button secondary mobile-edit-button"
+                  onClick={() => openEditor(transaction)}
+                >
+                  <Pencil size={16} />
+                  Edit details
+                </button>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+
+      <div className="pagination">
+        <div className="text-sm text-muted">
+          Showing {totalCount === 0 ? 0 : currentOffset + 1} to{' '}
+          {Math.min(currentOffset + currentLimit, totalCount)} of {totalCount} transactions
+        </div>
+        <div className="pagination-controls">
+          <button
+            onClick={prevPage}
+            disabled={currentOffset === 0 || loading}
+            className="icon-button"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <button
+            onClick={nextPage}
+            disabled={currentOffset + currentLimit >= totalCount || loading}
+            className="icon-button"
+          >
+            <ChevronRight size={20} />
+          </button>
         </div>
       </div>
 
@@ -681,6 +724,9 @@ const Transactions: React.FC = () => {
           border: 1px solid var(--border-color);
           overflow: hidden;
         }
+        .table-shell {
+          display: block;
+        }
         .table {
           width: 100%;
           border-collapse: collapse;
@@ -808,6 +854,67 @@ const Transactions: React.FC = () => {
         }
         .inline-error {
           color: #b91c1c;
+        }
+        .mobile-transaction-list {
+          display: none;
+          flex-direction: column;
+          gap: 0.9rem;
+        }
+        .mobile-transaction-card {
+          display: flex;
+          flex-direction: column;
+          gap: 0.9rem;
+          background: white;
+          border: 1px solid var(--border-color);
+          border-radius: 1rem;
+          padding: 1rem;
+          box-shadow: 0 14px 28px rgba(15, 23, 42, 0.05);
+        }
+        .mobile-transaction-top {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 1rem;
+        }
+        .mobile-transaction-date {
+          font-size: 0.76rem;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: var(--text-muted);
+          margin-bottom: 0.3rem;
+        }
+        .mobile-amount {
+          font-size: 1rem;
+          font-weight: 700;
+          text-align: right;
+          flex-shrink: 0;
+        }
+        .mobile-source-card {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.8rem;
+          padding: 0.7rem 0.8rem;
+          border-radius: 0.85rem;
+          background: #f8fafc;
+          font-size: 0.82rem;
+        }
+        .mobile-category-block {
+          display: flex;
+          flex-direction: column;
+          gap: 0.35rem;
+        }
+        .mobile-card-actions {
+          display: flex;
+          justify-content: flex-end;
+        }
+        .mobile-edit-button {
+          width: 100%;
+        }
+        .mobile-empty {
+          padding: 1.5rem;
+          text-align: center;
+          color: var(--text-muted);
         }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
@@ -962,6 +1069,32 @@ const Transactions: React.FC = () => {
         @media (max-width: 640px) {
           .filter-grid {
             grid-template-columns: 1fr;
+          }
+          .table-shell {
+            display: none;
+          }
+          .mobile-transaction-list {
+            display: flex;
+          }
+          .page-header {
+            align-items: stretch;
+          }
+          .quick-link {
+            width: 100%;
+          }
+          .mobile-transaction-top {
+            flex-direction: column;
+          }
+          .mobile-amount {
+            text-align: left;
+          }
+          .mobile-source-card {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          .category-cell,
+          .inline-category-editor {
+            max-width: none;
           }
           .summary-grid {
             grid-template-columns: 1fr;
