@@ -709,7 +709,6 @@ const Transactions: React.FC = () => {
         }
         .category-cell {
           min-width: 170px;
-          width: 220px;
         }
         .category-key {
           margin-top: 0.3rem;
@@ -724,7 +723,8 @@ const Transactions: React.FC = () => {
           font-weight: 600;
         }
         .category-trigger {
-          width: 100%;
+          width: auto;
+          max-width: 100%;
           gap: 0.35rem;
           border: none;
           cursor: pointer;
@@ -741,8 +741,8 @@ const Transactions: React.FC = () => {
           flex-direction: column;
           gap: 0.5rem;
           width: 100%;
-          max-width: 15rem;
-          padding: 0.65rem;
+          max-width: 13.5rem;
+          padding: 0.7rem 0.85rem 0.7rem 0.7rem;
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
           background: #f8fafc;
