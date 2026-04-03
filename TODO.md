@@ -94,3 +94,4 @@ This file tracks the progress of the **mony** project.
 - [x] CI/CD pipeline (GitHub Actions)
 - [x] Docker production build optimization
 - [x] Documentation for self-hosting (Docker Compose)
+- [x] Dev services: manage local db/backend/frontend with restartable user services
