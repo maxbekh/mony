@@ -9,34 +9,37 @@ import Transactions from './pages/Transactions';
 import Categorize from './pages/Categorize';
 import Import from './pages/Import';
 import Analytics from './pages/Analytics';
+import { ThemeProvider } from './theme/ThemeProvider';
 import './styles/index.css';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="*"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/transactions" element={<Transactions />} />
-                    <Route path="/categorize" element={<Categorize />} />
-                    <Route path="/import" element={<Import />} />
-                    <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/account" element={<Account />} />
-                  </Routes>
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Router>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="*"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/transactions" element={<Transactions />} />
+                      <Route path="/categorize" element={<Categorize />} />
+                      <Route path="/import" element={<Import />} />
+                      <Route path="/analytics" element={<Analytics />} />
+                      <Route path="/account" element={<Account />} />
+                    </Routes>
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

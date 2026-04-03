@@ -360,7 +360,7 @@ const Analytics: React.FC = () => {
         }
         .toolbar-card,
         .card {
-          background: white;
+          background: var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
         }
@@ -392,7 +392,8 @@ const Analytics: React.FC = () => {
           border-radius: 0.5rem;
           padding: 0.75rem;
           font-size: 0.875rem;
-          background: white;
+          background: var(--surface-color);
+          color: var(--text-main);
         }
         .preset-group {
           display: flex;
@@ -413,10 +414,10 @@ const Analytics: React.FC = () => {
         }
         .button.primary {
           background: var(--primary-color);
-          color: white;
+          color: var(--primary-contrast);
         }
         .button.secondary {
-          background: white;
+          background: var(--surface-color);
           color: var(--text-main);
           border-color: var(--border-color);
         }
@@ -432,9 +433,9 @@ const Analytics: React.FC = () => {
           border: 1px solid;
         }
         .notice.error {
-          background: #fef2f2;
-          border-color: #fca5a5;
-          color: #991b1b;
+          background: var(--danger-bg);
+          border-color: var(--danger-border);
+          color: var(--danger-text);
         }
         .stats-grid {
           display: grid;
@@ -442,7 +443,7 @@ const Analytics: React.FC = () => {
           gap: 1rem;
         }
         .stat-card {
-          background: white;
+          background: var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
           padding: 1.25rem;
@@ -458,9 +459,9 @@ const Analytics: React.FC = () => {
           align-items: center;
           justify-content: center;
         }
-        .stat-icon.spending { background: #fef2f2; color: #991b1b; }
-        .stat-icon.income { background: #f0fdf4; color: #166534; }
-        .stat-icon.total { background: #eff6ff; color: #1d4ed8; }
+        .stat-icon.spending { background: var(--danger-bg); color: var(--danger-text); }
+        .stat-icon.income { background: var(--success-surface); color: var(--success-text); }
+        .stat-icon.total { background: var(--surface-accent); color: var(--primary-color); }
         .stat-label {
           display: block;
           color: var(--text-muted);
@@ -508,7 +509,7 @@ const Analytics: React.FC = () => {
         .bar-track {
           height: 0.5rem;
           border-radius: 999px;
-          background: #eef2f7;
+          background: var(--surface-subtle);
           overflow: hidden;
         }
         .bar-fill {
@@ -534,7 +535,7 @@ const Analytics: React.FC = () => {
           padding: 0.95rem 1rem;
           border: 1px solid var(--border-color);
           border-radius: 0.9rem;
-          background: #fcfdff;
+          background: var(--surface-muted);
         }
         .mobile-analytics-top,
         .mobile-analytics-meta {
@@ -562,7 +563,7 @@ const Analytics: React.FC = () => {
           font-size: 0.75rem;
           text-transform: uppercase;
           color: var(--text-muted);
-          background: #f8fafc;
+          background: var(--surface-muted);
         }
         .table-category {
           font-weight: 600;
@@ -575,12 +576,8 @@ const Analytics: React.FC = () => {
         .text-right {
           text-align: right;
         }
-        .positive {
-          color: #166534;
-        }
-        .negative {
-          color: #991b1b;
-        }
+        .positive { color: var(--success-text); }
+        .negative { color: var(--danger-text); }
         .empty {
           color: var(--text-muted);
           text-align: center;

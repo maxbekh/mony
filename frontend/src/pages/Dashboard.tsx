@@ -291,7 +291,7 @@ const Dashboard: React.FC = () => {
         }
         .period-chip {
           border: 1px solid var(--border-color);
-          background: white;
+          background: var(--surface-color);
           border-radius: 999px;
           padding: 0.55rem 0.9rem;
           font-size: 0.875rem;
@@ -301,7 +301,7 @@ const Dashboard: React.FC = () => {
         .period-chip.active {
           background: var(--primary-color);
           border-color: var(--primary-color);
-          color: white;
+          color: var(--primary-contrast);
         }
         .analytics-link {
           display: inline-flex;
@@ -310,7 +310,7 @@ const Dashboard: React.FC = () => {
           padding: 0 0.95rem;
           border-radius: 999px;
           border: 1px solid var(--border-color);
-          background: white;
+          background: var(--surface-color);
           color: var(--text-main);
           text-decoration: none;
           font-size: 0.875rem;
@@ -322,9 +322,9 @@ const Dashboard: React.FC = () => {
           border: 1px solid;
         }
         .notice.error {
-          background: #fef2f2;
-          border-color: #fca5a5;
-          color: #991b1b;
+          background: var(--danger-bg);
+          border-color: var(--danger-border);
+          color: var(--danger-text);
         }
         .stats-grid {
           display: grid;
@@ -336,7 +336,7 @@ const Dashboard: React.FC = () => {
           display: flex;
           align-items: center;
           gap: 1.25rem;
-          background: white;
+          background: var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
         }
@@ -348,10 +348,10 @@ const Dashboard: React.FC = () => {
           align-items: center;
           justify-content: center;
         }
-        .income .stat-icon { background: #f0fdf4; color: #166534; }
-        .spending .stat-icon { background: #fef2f2; color: #991b1b; }
-        .balance .stat-icon { background: #eff6ff; color: #1e40af; }
-        .context .stat-icon { background: #f8fafc; color: #334155; }
+        .income .stat-icon { background: var(--success-surface); color: var(--success-text); }
+        .spending .stat-icon { background: var(--danger-bg); color: var(--danger-text); }
+        .balance .stat-icon { background: var(--surface-accent); color: var(--primary-color); }
+        .context .stat-icon { background: var(--surface-muted); color: var(--text-main); }
         .stat-content {
           display: flex;
           flex-direction: column;
@@ -376,7 +376,7 @@ const Dashboard: React.FC = () => {
           gap: 1.5rem;
         }
         .card {
-          background: white;
+          background: var(--surface-color);
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
           overflow: hidden;
@@ -418,7 +418,7 @@ const Dashboard: React.FC = () => {
         }
         .progress-bar {
           height: 0.5rem;
-          background: #f1f5f9;
+          background: var(--surface-hover);
           border-radius: 999px;
           overflow: hidden;
         }
@@ -443,7 +443,7 @@ const Dashboard: React.FC = () => {
           justify-content: space-between;
           gap: 1rem;
           padding-bottom: 0.875rem;
-          border-bottom: 1px solid #eef2f7;
+          border-bottom: 1px solid var(--surface-subtle);
         }
         .insight-row:last-child {
           border-bottom: none;

@@ -339,7 +339,7 @@ const Import: React.FC = () => {
           align-items: start;
         }
         .card {
-          background: white;
+          background: var(--surface-color);
           border-radius: 0.75rem;
           border: 1px solid var(--border-color);
         }
@@ -369,6 +369,8 @@ const Import: React.FC = () => {
           outline: none;
           font-size: 0.875rem;
           transition: border-color 0.2s;
+          background: var(--surface-color);
+          color: var(--text-main);
         }
         .form-input:focus {
           border-color: var(--primary-color);
@@ -384,7 +386,7 @@ const Import: React.FC = () => {
         }
         .file-dropzone:hover {
           border-color: var(--primary-color);
-          background: #f8fafc;
+          background: var(--surface-muted);
         }
         .file-input {
           position: absolute;
@@ -420,13 +422,13 @@ const Import: React.FC = () => {
         }
         .button.primary {
           background: var(--primary-color);
-          color: white;
+          color: var(--primary-contrast);
         }
         .button.primary:hover {
           background: var(--primary-hover);
         }
         .button.secondary {
-          background: #f8fafc;
+          background: var(--surface-muted);
           border-color: var(--border-color);
           color: var(--text-main);
         }
@@ -462,7 +464,7 @@ const Import: React.FC = () => {
           padding: 1rem;
           border: 1px solid var(--border-color);
           border-radius: 0.75rem;
-          background: #fcfcfd;
+          background: var(--surface-muted);
         }
         .import-item-main {
           min-width: 0;
@@ -496,12 +498,12 @@ const Import: React.FC = () => {
           text-transform: capitalize;
         }
         .status-completed {
-          background: #dcfce7;
-          color: #166534;
+          background: var(--success-surface);
+          color: var(--success-text);
         }
         .status-pending {
-          background: #fef3c7;
-          color: #92400e;
+          background: var(--warning-surface);
+          color: var(--warning-text);
         }
         .icon-button {
           display: inline-flex;
@@ -511,13 +513,13 @@ const Import: React.FC = () => {
           height: 2.25rem;
           border-radius: 0.5rem;
           border: 1px solid var(--border-color);
-          background: white;
+          background: var(--surface-color);
           cursor: pointer;
         }
         .danger-button {
-          color: #b91c1c;
-          border-color: #fecaca;
-          background: #fff1f2;
+          color: var(--danger-text);
+          border-color: var(--danger-border);
+          background: var(--danger-bg);
           flex-shrink: 0;
         }
         .empty-state {
@@ -538,12 +540,12 @@ const Import: React.FC = () => {
           gap: 1rem;
         }
         .result-card.success {
-          background: #ecfdf5;
-          border: 1px solid #86efac;
+          background: var(--success-surface);
+          border: 1px solid var(--success-border);
         }
         .result-card.error {
-          background: #fef2f2;
-          border: 1px solid #fca5a5;
+          background: var(--danger-bg);
+          border: 1px solid var(--danger-border);
         }
         .result-header {
           display: flex;
@@ -570,7 +572,7 @@ const Import: React.FC = () => {
         }
         .error-message {
           margin: 0;
-          color: #991b1b;
+          color: var(--danger-text);
         }
         .animate-spin {
           animation: spin 1s linear infinite;
