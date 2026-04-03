@@ -2,7 +2,7 @@
 name = "mony-backend"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.78"
+rust-version = "1.88"
 
 [dependencies]
 axum = { version = "0.8.8", features = ["json", "tokio", "multipart"] }
@@ -15,6 +15,7 @@ sha2 = "0.10.8"
 sqlx = { version = "0.8.6", default-features = false, features = ["migrate", "postgres", "runtime-tokio", "chrono", "uuid", "macros", "derive"] }
 thiserror = "2.0.18"
 tokio = { version = "1.50.0", features = ["macros", "net", "rt-multi-thread", "signal"] }
+dotenvy = "0.15.7"
 tower-http = { version = "0.6.8", features = ["trace"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }

@@ -72,9 +72,21 @@ Any example dataset or fixture added to the repository must be synthetic or irre
 
 1. Copy `.env.example` to `.env`.
 2. Replace `POSTGRES_PASSWORD` with a long random password.
-3. Install a Rust toolchain with `rustup` if it is not already available.
+3. Install Rust 1.88 or newer with `rustup` if it is not already available.
 4. Validate the project with `make check`.
 5. Start PostgreSQL with `make up-db`.
 6. Run the backend with `make run-backend`.
 
 The compose file now requires explicit environment variables to avoid accidental insecure defaults.
+
+## Self-Hosting with Docker Compose
+
+For a containerized deployment path, use the Docker Compose stack documented in [docs/self-hosting.md](./docs/self-hosting.md).
+
+Quick start:
+
+1. Copy `.env.example` to `.env`.
+2. Replace `POSTGRES_PASSWORD`.
+3. Run `docker compose --env-file .env up --build -d`.
+
+The frontend is exposed on `http://localhost/` and proxies API requests to the backend internally.

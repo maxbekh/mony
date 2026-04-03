@@ -1,0 +1,11 @@
+target/
+.git/
+.github/
+.env
+node_modules/
+frontend/node_modules/
+frontend/dist/
+backend/target/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*

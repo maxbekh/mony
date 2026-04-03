@@ -9,6 +9,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let _ = dotenvy::dotenv();
     init_tracing();
 
     let config = AppConfig::from_env()?;

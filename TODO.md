@@ -37,11 +37,12 @@ This file tracks the progress of the **mony** project.
 - [x] CSV Parsing library integration (e.g., `csv` crate)
 - [x] Endpoint: `POST /v1/imports` (File upload)
 - [x] Logic: Deduplication and idempotent imports
+- [x] **First POC: Full flow from CSV import to Dashboard visualization**
 - [ ] Logic: Background processing for large imports (optional for MVP)
 
 ## Infrastructure & DX
 
 - [x] Makefile improvements (build, lint, test)
-- [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Docker production build optimization
-- [ ] Documentation for self-hosting (Docker Compose)
+- [x] CI/CD pipeline (GitHub Actions)
+- [x] Docker production build optimization
+- [x] Documentation for self-hosting (Docker Compose)

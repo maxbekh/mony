@@ -1,12 +1,9 @@
 import React from 'react';
+import Dashboard from './Dashboard';
 
 const Analytics: React.FC = () => {
-  return (
-    <div>
-      <h1>Analytics</h1>
-      <p>Analyze your spending habits.</p>
-    </div>
-  );
+  // For the POC, Analytics and Dashboard share the same overview
+  return <Dashboard />;
 };
 
 export default Analytics;
