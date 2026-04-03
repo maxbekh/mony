@@ -1,6 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { ChevronLeft, ChevronRight, Filter, Pencil, Search, Tags, X } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Pencil,
+  Search,
+  Tags,
+  X,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import type { Category, Transaction, TransactionListParams } from '../types';
@@ -31,6 +41,11 @@ const Transactions: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [editDescription, setEditDescription] = useState('');
   const [editCategoryKey, setEditCategoryKey] = useState('');
+  const [inlineCategoryTransactionId, setInlineCategoryTransactionId] = useState<string | null>(
+    null,
+  );
+  const [inlineSavingTransactionId, setInlineSavingTransactionId] = useState<string | null>(null);
+  const [inlineCategoryError, setInlineCategoryError] = useState<string | null>(null);
   const [params, setParams] = useState<TransactionListParams>({
     limit: 20,
     offset: 0,
@@ -55,6 +70,30 @@ const Transactions: React.FC = () => {
     }
 
     return categoryLabels.get(categoryKey) ?? categoryKey;
+  };
+
+  const transactionMatchesActiveFilters = (transaction: Transaction) => {
+    if (params.uncategorized_only) {
+      return transaction.category_key === null;
+    }
+
+    if (params.category_key && transaction.category_key !== params.category_key) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const applyTransactionUpdate = (updated: Transaction) => {
+    if (!transactionMatchesActiveFilters(updated)) {
+      setTransactions((current) => current.filter((transaction) => transaction.id !== updated.id));
+      setTotalCount((current) => Math.max(0, current - 1));
+      return;
+    }
+
+    setTransactions((current) =>
+      current.map((transaction) => (transaction.id === updated.id ? updated : transaction)),
+    );
   };
 
   const loadTransactions = async (requestParams: TransactionListParams) => {
@@ -117,6 +156,16 @@ const Transactions: React.FC = () => {
     setEditError(null);
   };
 
+  const openInlineCategoryEditor = (transactionId: string) => {
+    setInlineCategoryError(null);
+    setInlineCategoryTransactionId(transactionId);
+  };
+
+  const closeInlineCategoryEditor = () => {
+    setInlineCategoryTransactionId(null);
+    setInlineCategoryError(null);
+  };
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setParams({ ...params, search: e.target.value, offset: 0 });
   };
@@ -173,14 +222,27 @@ const Transactions: React.FC = () => {
         category_key: editCategoryKey || null,
       });
 
-      setTransactions((current) =>
-        current.map((transaction) => (transaction.id === updated.id ? updated : transaction)),
-      );
+      applyTransactionUpdate(updated);
       closeEditor();
     } catch (error) {
       setEditError(getErrorMessage(error, 'Failed to update transaction.'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateInlineCategory = async (transaction: Transaction, categoryKey: string | null) => {
+    setInlineSavingTransactionId(transaction.id);
+    setInlineCategoryError(null);
+
+    try {
+      const updated = await api.updateTransaction(transaction.id, { category_key: categoryKey });
+      applyTransactionUpdate(updated);
+      closeInlineCategoryEditor();
+    } catch (error) {
+      setInlineCategoryError(getErrorMessage(error, 'Failed to update transaction category.'));
+    } finally {
+      setInlineSavingTransactionId(null);
     }
   };
 
@@ -326,13 +388,79 @@ const Transactions: React.FC = () => {
                     )}
                   </td>
                   <td className="category-cell">
-                    <span
-                      className={`badge ${transaction.category_key ? 'category' : 'uncategorized'}`}
-                    >
-                      {getCategoryLabel(transaction.category_key)}
-                    </span>
-                    {transaction.category_key && (
-                      <div className="text-muted text-xs category-key">{transaction.category_key}</div>
+                    {inlineCategoryTransactionId === transaction.id ? (
+                      <div className="inline-category-editor">
+                        <div className="inline-category-header">
+                          <span className="text-xs text-muted">Choose a category</span>
+                          <button
+                            type="button"
+                            className="inline-close-button"
+                            onClick={closeInlineCategoryEditor}
+                            aria-label="Close category editor"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <select
+                          value={transaction.category_key ?? ''}
+                          onChange={(e) =>
+                            void updateInlineCategory(transaction, e.target.value || null)
+                          }
+                          className="inline-category-select"
+                          disabled={inlineSavingTransactionId === transaction.id}
+                          autoFocus
+                        >
+                          <option value="">Uncategorized</option>
+                          {categories.map((category) => (
+                            <option key={category.key} value={category.key}>
+                              {category.label}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="inline-category-actions">
+                          <button
+                            type="button"
+                            className="inline-link-button"
+                            onClick={() => void updateInlineCategory(transaction, null)}
+                            disabled={
+                              inlineSavingTransactionId === transaction.id ||
+                              transaction.category_key === null
+                            }
+                          >
+                            Clear
+                          </button>
+                          {inlineSavingTransactionId === transaction.id ? (
+                            <span className="text-xs text-muted">Saving...</span>
+                          ) : (
+                            <span className="text-xs text-muted inline-save-hint">
+                              <Check size={12} />
+                              Save on select
+                            </span>
+                          )}
+                        </div>
+                        {inlineCategoryError && (
+                          <div className="text-xs inline-error">{inlineCategoryError}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className={`badge category-trigger ${
+                            transaction.category_key ? 'category' : 'uncategorized'
+                          }`}
+                          onClick={() => openInlineCategoryEditor(transaction.id)}
+                          aria-label={`Change category for ${transaction.description}`}
+                        >
+                          <span>{getCategoryLabel(transaction.category_key)}</span>
+                          <ChevronDown size={14} />
+                        </button>
+                        {transaction.category_key && (
+                          <div className="text-muted text-xs category-key">
+                            {transaction.category_key}
+                          </div>
+                        )}
+                      </>
                     )}
                   </td>
                   <td>
@@ -593,8 +721,89 @@ const Transactions: React.FC = () => {
           font-size: 0.75rem;
           font-weight: 600;
         }
+        .category-trigger {
+          gap: 0.35rem;
+          border: none;
+          cursor: pointer;
+          transition: transform 120ms ease, box-shadow 120ms ease;
+        }
+        .category-trigger:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+        }
         .badge.category { background: #dbeafe; color: #1e40af; }
         .badge.uncategorized { background: #f1f5f9; color: #475569; }
+        .inline-category-editor {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          min-width: 13rem;
+          padding: 0.75rem;
+          border: 1px solid var(--border-color);
+          border-radius: 0.75rem;
+          background: #f8fafc;
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        }
+        .inline-category-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.5rem;
+        }
+        .inline-close-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 1.75rem;
+          height: 1.75rem;
+          border: none;
+          border-radius: 999px;
+          background: transparent;
+          color: var(--text-muted);
+          cursor: pointer;
+        }
+        .inline-close-button:hover {
+          background: rgba(148, 163, 184, 0.14);
+          color: var(--text-main);
+        }
+        .inline-category-select {
+          width: 100%;
+          min-height: 2.5rem;
+          border: 1px solid var(--border-color);
+          border-radius: 0.6rem;
+          padding: 0.65rem 0.75rem;
+          background: white;
+          font: inherit;
+        }
+        .inline-category-actions {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
+        }
+        .inline-link-button {
+          border: none;
+          background: transparent;
+          color: var(--text-muted);
+          padding: 0;
+          font: inherit;
+          cursor: pointer;
+        }
+        .inline-link-button:hover {
+          color: var(--text-main);
+        }
+        .inline-link-button:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+        .inline-save-hint {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+        }
+        .inline-error {
+          color: #b91c1c;
+        }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
