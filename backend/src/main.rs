@@ -6,6 +6,7 @@ use mony_backend::{
     categorization::reapply_category_rules,
     config::AppConfig,
     db::connect_and_migrate,
+    security::RateLimiter,
     state::AppState,
 };
 use tokio::{net::TcpListener, signal};
@@ -48,7 +49,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let address = config.address();
     let listener = TcpListener::bind(&address).await?;
-    let state = AppState { db: pool, auth };
+    let state = AppState {
+        db: pool,
+        auth,
+        rate_limiter: RateLimiter::new(),
+    };
 
     info!(%address, "starting backend");
 

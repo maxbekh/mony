@@ -12,8 +12,8 @@ use tower_http::trace::TraceLayer;
 use crate::{
     analytics::{get_spending_by_category, AnalyticsError, AnalyticsParams, AnalyticsResponse},
     auth::{
-        bootstrap, bootstrap_status, change_password, jwks, list_sessions, login, logout,
-        logout_all, refresh, require_auth, revoke_session_handler, session,
+        bootstrap, bootstrap_status, change_password, jwks, list_auth_events, list_sessions, login,
+        logout, logout_all, refresh, require_auth, revoke_session_handler, session,
     },
     categories::{list_categories, Category},
     imports::{
@@ -21,6 +21,7 @@ use crate::{
         ImportManagementError,
     },
     ingestion::ingest_csv,
+    security::rate_limit_auth,
     state::AppState,
     transactions::{
         get_transaction, list_transactions, update_transaction, TransactionListError,
@@ -61,17 +62,25 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/auth/logout/all", post(logout_all))
         .route("/v1/auth/change-password", post(change_password))
         .route("/v1/auth/sessions", get(list_sessions))
+        .route("/v1/auth/events", get(list_auth_events))
         .route("/v1/auth/sessions/{id}", delete(revoke_session_handler))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
+
+    let auth_public_api = Router::new()
+        .route("/v1/auth/bootstrap/status", get(bootstrap_status))
+        .route("/v1/auth/bootstrap", post(bootstrap))
+        .route("/v1/auth/login", post(login))
+        .route("/v1/auth/refresh", post(refresh))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            rate_limit_auth,
+        ));
 
     Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
         .route("/.well-known/jwks.json", get(jwks))
-        .route("/v1/auth/bootstrap/status", get(bootstrap_status))
-        .route("/v1/auth/bootstrap", post(bootstrap))
-        .route("/v1/auth/login", post(login))
-        .route("/v1/auth/refresh", post(refresh))
+        .merge(auth_public_api)
         .merge(protected_api)
         .with_state(state)
         .layer(TraceLayer::new_for_http())
@@ -328,7 +337,7 @@ mod tests {
     use sqlx::postgres::PgPoolOptions;
     use tower::util::ServiceExt;
 
-    use crate::{auth::test_support, state::AppState};
+    use crate::{auth::test_support, security::RateLimiter, state::AppState};
 
     use super::build_router;
 
@@ -341,6 +350,7 @@ mod tests {
         AppState {
             db: pool,
             auth: test_support::auth_state(),
+            rate_limiter: RateLimiter::new(),
         }
     }
 

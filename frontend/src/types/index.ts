@@ -144,3 +144,17 @@ export interface AuthSessionViewResponse {
   scopes: string[];
   session_id: string;
 }
+
+export interface AuthEvent {
+  id: string;
+  user_id: string | null;
+  session_id: string | null;
+  event_type: string;
+  ip_address: string | null;
+  metadata: JsonValue;
+  created_at: string;
+}
+
+export interface AuthEventListResponse {
+  items: AuthEvent[];
+}

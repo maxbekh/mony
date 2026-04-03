@@ -334,6 +334,27 @@ pub struct SessionListResponse {
     pub items: Vec<AuthSessionResponse>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AuthEventListParams {
+    pub limit: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AuthEventResponse {
+    pub id: String,
+    pub user_id: Option<String>,
+    pub session_id: Option<String>,
+    pub event_type: String,
+    pub ip_address: Option<String>,
+    pub metadata: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AuthEventListResponse {
+    pub items: Vec<AuthEventResponse>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct PublicBootstrapStatus {
     pub refresh_cookie_name: &'static str,
@@ -387,6 +408,17 @@ struct RefreshTokenRecord {
     session_revoked_at: Option<DateTime<Utc>>,
     user_id: Uuid,
     username: String,
+}
+
+#[derive(Debug, FromRow)]
+struct AuthEventRecord {
+    id: Uuid,
+    user_id: Option<Uuid>,
+    session_id: Option<Uuid>,
+    event_type: String,
+    ip_address: Option<String>,
+    metadata: serde_json::Value,
+    created_at: DateTime<Utc>,
 }
 
 pub async fn require_auth(
@@ -478,12 +510,25 @@ pub async fn login(
     Json(payload): Json<LoginRequest>,
 ) -> Result<(HeaderMap, Json<AuthTokenPairResponse>), AuthError> {
     let username = normalize_username(&payload.username)?;
-    let user = find_user_by_username(&state.db, &username)
-        .await?
-        .ok_or_else(|| AuthError::Unauthorized("invalid credentials".to_string()))?;
+    let user = match find_user_by_username(&state.db, &username).await? {
+        Some(user) => user,
+        None => {
+            log_auth_failure(&state.db, &headers, "login_failed", &username, None).await?;
+            return Err(AuthError::Unauthorized("invalid credentials".to_string()));
+        }
+    };
 
-    verify_password(&payload.password, &user.password_hash)
-        .map_err(|_| AuthError::Unauthorized("invalid credentials".to_string()))?;
+    if verify_password(&payload.password, &user.password_hash).is_err() {
+        log_auth_failure(
+            &state.db,
+            &headers,
+            "login_failed",
+            &username,
+            Some(user.id),
+        )
+        .await?;
+        return Err(AuthError::Unauthorized("invalid credentials".to_string()));
+    }
 
     let context = request_context(&headers, payload.device_name);
     let mut tx = state
@@ -756,6 +801,33 @@ pub async fn list_sessions(
             .into_iter()
             .map(AuthSessionResponse::from)
             .collect(),
+    }))
+}
+
+pub async fn list_auth_events(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    axum::extract::Query(params): axum::extract::Query<AuthEventListParams>,
+) -> Result<Json<AuthEventListResponse>, AuthError> {
+    let limit = params.limit.unwrap_or(25).clamp(1, 100);
+    let events = sqlx::query_as::<_, AuthEventRecord>(
+        r#"
+        SELECT id, user_id, session_id, event_type, ip_address, metadata, created_at
+        FROM auth_event
+        WHERE user_id = $1 OR (user_id IS NULL AND metadata->>'username' = $2)
+        ORDER BY created_at DESC
+        LIMIT $3
+        "#,
+    )
+    .bind(auth.user_id)
+    .bind(&auth.username)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    Ok(Json(AuthEventListResponse {
+        items: events.into_iter().map(AuthEventResponse::from).collect(),
     }))
 }
 
@@ -1057,6 +1129,31 @@ async fn log_auth_event(
     Ok(())
 }
 
+async fn log_auth_failure(
+    pool: &PgPool,
+    headers: &HeaderMap,
+    event_type: &str,
+    username: &str,
+    user_id: Option<Uuid>,
+) -> Result<(), AuthError> {
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+    log_auth_event(
+        &mut tx,
+        user_id,
+        None,
+        event_type,
+        request_ip_address(headers).as_deref(),
+        json!({ "username": username }),
+    )
+    .await?;
+    tx.commit()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))
+}
+
 fn normalize_username(input: &str) -> Result<String, AuthError> {
     let username = input.trim().to_ascii_lowercase();
     let is_valid = !username.is_empty()
@@ -1202,6 +1299,20 @@ fn sanitize_optional_text(input: Option<String>, max_length: usize) -> Option<St
                 .collect::<String>()
         })
         .filter(|value| !value.is_empty())
+}
+
+impl From<AuthEventRecord> for AuthEventResponse {
+    fn from(value: AuthEventRecord) -> Self {
+        Self {
+            id: value.id.to_string(),
+            user_id: value.user_id.map(|id| id.to_string()),
+            session_id: value.session_id.map(|id| id.to_string()),
+            event_type: value.event_type,
+            ip_address: value.ip_address,
+            metadata: value.metadata,
+            created_at: value.created_at,
+        }
+    }
 }
 
 fn extract_bearer(headers: &HeaderMap) -> Result<&str, AuthError> {
@@ -1459,7 +1570,11 @@ mod tests {
             .max_connections(1)
             .connect_lazy("postgres://mony:mony@127.0.0.1:5432/mony")
             .expect("lazy pool should initialize");
-        let state = crate::state::AppState { db: pool, auth };
+        let state = crate::state::AppState {
+            db: pool,
+            auth,
+            rate_limiter: crate::security::RateLimiter::new(),
+        };
         let app = Router::new()
             .route("/private", get(|| async { StatusCode::OK }))
             .route_layer(middleware::from_fn_with_state(
