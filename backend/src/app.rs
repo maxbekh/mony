@@ -1,7 +1,7 @@
 use axum::{
     extract::{Multipart, Path, Query, State},
     http::StatusCode,
-    routing::{get, patch, post},
+    routing::{delete, get, patch, post},
     Json, Router,
 };
 use serde::Serialize;
@@ -11,6 +11,10 @@ use tower_http::trace::TraceLayer;
 use crate::{
     analytics::{get_spending_by_category, AnalyticsResponse},
     categories::{list_categories, Category},
+    imports::{
+        delete_import, list_imports, DeleteImportResponse, ImportBatchListResponse,
+        ImportManagementError,
+    },
     ingestion::ingest_csv,
     state::AppState,
     transactions::{
@@ -39,7 +43,8 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
-        .route("/v1/imports", post(import_csv))
+        .route("/v1/imports", post(import_csv).get(get_imports))
+        .route("/v1/imports/{id}", delete(delete_import_batch))
         .route("/v1/transactions", get(get_transactions))
         .route("/v1/transactions/{id}", get(get_transaction_by_id))
         .route("/v1/transactions/{id}", patch(patch_transaction))
@@ -155,6 +160,28 @@ async fn import_csv(
     ))
 }
 
+async fn get_imports(
+    State(state): State<AppState>,
+) -> Result<Json<ImportBatchListResponse>, (StatusCode, String)> {
+    let response = list_imports(&state.db)
+        .await
+        .map_err(map_import_management_error)?;
+
+    Ok(Json(response))
+}
+
+async fn delete_import_batch(
+    State(state): State<AppState>,
+    Path(id): Path<uuid::Uuid>,
+) -> Result<Json<DeleteImportResponse>, (StatusCode, String)> {
+    let response = delete_import(&state.db, id)
+        .await
+        .map_err(map_import_management_error)?
+        .ok_or((StatusCode::NOT_FOUND, "Import not found".to_string()))?;
+
+    Ok(Json(response))
+}
+
 fn map_ingestion_error(error: crate::ingestion::IngestionError) -> (StatusCode, String) {
     match error {
         crate::ingestion::IngestionError::DuplicateFile(message) => (StatusCode::CONFLICT, message),
@@ -163,6 +190,14 @@ fn map_ingestion_error(error: crate::ingestion::IngestionError) -> (StatusCode, 
         | crate::ingestion::IngestionError::InvalidAmount(_)
         | crate::ingestion::IngestionError::Csv(_) => (StatusCode::BAD_REQUEST, error.to_string()),
         crate::ingestion::IngestionError::Database(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+        }
+    }
+}
+
+fn map_import_management_error(error: ImportManagementError) -> (StatusCode, String) {
+    match error {
+        ImportManagementError::Database(error) => {
             (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
         }
     }

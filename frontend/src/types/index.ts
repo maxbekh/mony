@@ -56,6 +56,29 @@ export interface ImportResponse {
   message: string;
 }
 
+export interface ImportBatch {
+  id: string;
+  source_name: string;
+  source_account_ref: string;
+  original_filename: string;
+  status: string;
+  row_count: number;
+  imported_at: string;
+  created_at: string;
+  transaction_count: number;
+}
+
+export interface ImportBatchListResponse {
+  items: ImportBatch[];
+}
+
+export interface DeleteImportResponse {
+  batch_id: string;
+  deleted_transactions: number;
+  deleted_rows: number;
+  message: string;
+}
+
 export interface Category {
   key: string;
   label: string;

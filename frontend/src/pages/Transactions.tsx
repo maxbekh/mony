@@ -12,23 +12,28 @@ const Transactions: React.FC = () => {
     offset: 0,
     search: '',
   });
-
-  const fetchTransactions = async () => {
-    setLoading(true);
-    try {
-      const response = await api.listTransactions(params);
-      setTransactions(response.items);
-      setTotalCount(response.total_count);
-    } catch (error) {
-      console.error('Failed to fetch transactions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const currentLimit = params.limit ?? 20;
+  const currentOffset = params.offset ?? 0;
 
   useEffect(() => {
-    fetchTransactions();
-  }, [params.offset, params.limit]);
+    const fetchTransactions = async () => {
+      setLoading(true);
+      try {
+        const response = await api.listTransactions({
+          limit: currentLimit,
+          offset: currentOffset,
+        });
+        setTransactions(response.items);
+        setTotalCount(response.total_count);
+      } catch (error) {
+        console.error('Failed to fetch transactions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void fetchTransactions();
+  }, [currentOffset, currentLimit]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setParams({ ...params, search: e.target.value, offset: 0 });
@@ -36,7 +41,18 @@ const Transactions: React.FC = () => {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchTransactions();
+    void (async () => {
+      setLoading(true);
+      try {
+        const response = await api.listTransactions(params);
+        setTransactions(response.items);
+        setTotalCount(response.total_count);
+      } catch (error) {
+        console.error('Failed to fetch transactions:', error);
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   const formatAmount = (amount_minor: number, currency: string) => {
@@ -47,14 +63,14 @@ const Transactions: React.FC = () => {
   };
 
   const nextPage = () => {
-    if ((params.offset ?? 0) + (params.limit ?? 20) < totalCount) {
-      setParams({ ...params, offset: (params.offset ?? 0) + (params.limit ?? 20) });
+    if (currentOffset + currentLimit < totalCount) {
+      setParams({ ...params, offset: currentOffset + currentLimit });
     }
   };
 
   const prevPage = () => {
-    if ((params.offset ?? 0) > 0) {
-      setParams({ ...params, offset: Math.max(0, (params.offset ?? 0) - (params.limit ?? 20)) });
+    if (currentOffset > 0) {
+      setParams({ ...params, offset: Math.max(0, currentOffset - currentLimit) });
     }
   };
 
@@ -127,19 +143,19 @@ const Transactions: React.FC = () => {
 
         <div className="pagination">
           <div className="text-sm text-muted">
-            Showing {(params.offset ?? 0) + 1} to {Math.min((params.offset ?? 0) + (params.limit ?? 20), totalCount)} of {totalCount} transactions
+            Showing {currentOffset + 1} to {Math.min(currentOffset + currentLimit, totalCount)} of {totalCount} transactions
           </div>
           <div className="pagination-controls">
             <button
               onClick={prevPage}
-              disabled={params.offset === 0 || loading}
+              disabled={currentOffset === 0 || loading}
               className="icon-button"
             >
               <ChevronLeft size={20} />
             </button>
             <button
               onClick={nextPage}
-              disabled={(params.offset ?? 0) + (params.limit ?? 20) >= totalCount || loading}
+              disabled={currentOffset + currentLimit >= totalCount || loading}
               className="icon-button"
             >
               <ChevronRight size={20} />

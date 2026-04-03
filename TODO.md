@@ -42,8 +42,8 @@ This file tracks the progress of the **mony** project.
 
 ## Next Product Slices
 
-- [ ] Import management: list imports with source metadata and support deletion flows
-- [ ] Import management: define deletion semantics for batches and related transactions
+- [x] Import management: list imports with source metadata and support deletion flows
+- [x] Import management: define deletion semantics for batches and related transactions
 - [ ] Transaction editing: support category and description management with clear validation rules
 - [ ] Dashboard: add selectable periods for summary views
 - [ ] Product/UI: separate dashboard summaries from deeper analytics flows
