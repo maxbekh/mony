@@ -19,9 +19,9 @@ pub async fn get_spending_by_category(pool: &PgPool) -> Result<AnalyticsResponse
         r#"
         SELECT
             category_key,
-            SUM(amount_minor) as total_amount_minor,
+            SUM(amount_minor)::BIGINT as total_amount_minor,
             currency,
-            COUNT(*) as transaction_count
+            COUNT(*)::BIGINT as transaction_count
         FROM ledger_transaction
         GROUP BY category_key, currency
         ORDER BY total_amount_minor DESC

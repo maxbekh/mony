@@ -14,7 +14,11 @@ pub struct CategoryRule {
 pub const SYSTEM_CATEGORIES: &[CategoryRule] = &[
     CategoryRule {
         key: "income.salary",
-        keywords: &["salary", "salaire", "payroll", "virement employeur"],
+        keywords: &["salary", "salaire", "payroll", "virement employeur", "vir "],
+    },
+    CategoryRule {
+        key: "income.social",
+        keywords: &["caf", "social", "allocations"],
     },
     CategoryRule {
         key: "food.grocery",

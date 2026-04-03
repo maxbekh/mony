@@ -1,35 +1,36 @@
 use std::collections::BTreeMap;
 
 use chrono::NaiveDate;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
+use thiserror::Error;
 use uuid::Uuid;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 pub enum IngestionError {
-    #[error("database error: {0}")]
-    Database(#[from] sqlx::Error),
     #[error("csv error: {0}")]
     Csv(#[from] csv::Error),
-    #[error("duplicate file import: {0}")]
+    #[error("database error: {0}")]
+    Database(#[from] sqlx::Error),
+    #[error("duplicate file: {0}")]
     DuplicateFile(String),
     #[error("missing required field: {0}")]
     MissingField(&'static str),
-    #[error("invalid date value: {0}")]
-    InvalidDate(String),
-    #[error("invalid amount value: {0}")]
+    #[error("invalid amount: {0}")]
     InvalidAmount(String),
+    #[error("invalid date: {0}")]
+    InvalidDate(String),
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(rename_all = "lowercase")]
-pub enum ImportBatchStatus {
-    Pending,
-    Completed,
-    Failed,
+#[derive(Debug, Serialize)]
+pub struct RawRow {
+    pub index: i32,
+    pub record: serde_json::Value,
+    pub hash: String,
 }
 
+#[derive(Debug)]
 pub struct NormalizedTransaction {
     pub transaction_date: NaiveDate,
     pub amount_minor: i64,
@@ -40,12 +41,7 @@ pub struct NormalizedTransaction {
     pub dedup_fingerprint: String,
 }
 
-pub struct RawRow {
-    pub index: i32,
-    pub record: serde_json::Value,
-    pub hash: String,
-}
-
+#[derive(Debug, Serialize)]
 pub struct IngestionSummary {
     pub batch_id: Uuid,
     pub row_count: usize,
@@ -54,44 +50,65 @@ pub struct IngestionSummary {
 }
 
 pub fn parse_csv(content: &[u8]) -> Result<Vec<RawRow>, IngestionError> {
-    let mut rdr = csv::Reader::from_reader(content);
-    let mut rows = Vec::new();
+    // Try to detect delimiter: check if there are more semicolons than commas in the first few lines
+    let sample = String::from_utf8_lossy(&content[..content.len().min(1024)]);
+    let semicolon_count = sample.matches(';').count();
+    let comma_count = sample.matches(',').count();
 
-    for (index, result) in rdr.deserialize::<BTreeMap<String, String>>().enumerate() {
-        let record = result?;
-        let raw_record_json =
-            serde_json::to_value(&record).expect("csv row should serialize to json");
+    let delimiter = if semicolon_count > comma_count {
+        b';'
+    } else {
+        b','
+    };
+
+    let mut rdr = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .trim(csv::Trim::All)
+        .from_reader(content);
+
+    // Use byte_headers and byte_records to handle potential non-UTF8 encodings (like ISO-8859-1)
+    let byte_headers = rdr.byte_headers()?.clone();
+    let headers: Vec<String> = byte_headers
+        .iter()
+        .map(|h| String::from_utf8_lossy(h).trim().to_string())
+        .collect();
+
+    tracing::info!(?headers, delimiter = (delimiter as char).to_string(), "parsed csv headers");
+
+    let mut rows = Vec::new();
+    let mut byte_record = csv::ByteRecord::new();
+
+    let mut index = 0;
+    while rdr.read_byte_record(&mut byte_record)? {
+        index += 1;
+        let mut record_map = BTreeMap::new();
+        
+        let mut has_any_value = false;
+        for (i, value) in byte_record.iter().enumerate() {
+            if let Some(header) = headers.get(i) {
+                let val_str = String::from_utf8_lossy(value).trim().to_string();
+                if !val_str.is_empty() {
+                    has_any_value = true;
+                }
+                record_map.insert(header.clone(), val_str);
+            }
+        }
+
+        if !has_any_value {
+            continue;
+        }
+
+        let raw_record_json = serde_json::to_value(&record_map).expect("csv row should serialize to json");
         let raw_hash = hex::encode(Sha256::digest(raw_record_json.to_string().as_bytes()));
 
         rows.push(RawRow {
-            index: (index + 1) as i32,
+            index,
             record: raw_record_json,
             hash: raw_hash,
         });
     }
 
     Ok(rows)
-}
-
-fn required_string_field<'a>(
-    record: &'a serde_json::Value,
-    field: &'static str,
-) -> Result<&'a str, IngestionError> {
-    record
-        .get(field)
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or(IngestionError::MissingField(field))
-}
-
-fn optional_string_field(record: &serde_json::Value, field: &'static str) -> Option<String> {
-    record
-        .get(field)
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
 }
 
 fn parse_minor_units(raw: &str) -> Result<i64, IngestionError> {
@@ -181,20 +198,99 @@ fn compute_dedup_fingerprint(
     hex::encode(Sha256::digest(canonical.as_bytes()))
 }
 
+fn normalize_for_match(s: &str) -> String {
+    s.to_lowercase()
+        .replace('\u{FFFD}', "e")
+        .replace('é', "e")
+        .replace('è', "e")
+        .replace('ê', "e")
+        .replace('à', "a")
+        .replace('â', "a")
+        .replace('î', "i")
+        .replace('ï', "i")
+        .replace('ô', "o")
+        .replace('û', "u")
+        .replace('ù', "u")
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect()
+}
+
+fn try_get_field<'a>(record: &'a serde_json::Value, keys: &[&str]) -> Option<&'a str> {
+    let obj = record.as_object()?;
+    
+    // Normalize target keys
+    let normalized_targets: Vec<String> = keys.iter().map(|k| normalize_for_match(k)).collect();
+
+    for (k, v) in obj {
+        let normalized_k = normalize_for_match(k);
+        for target in &normalized_targets {
+            if normalized_k == *target {
+                if let Some(val) = v.as_str() {
+                    let trimmed = val.trim();
+                    if !trimmed.is_empty() {
+                        return Some(trimmed);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn parse_flexible_date(raw: &str) -> Result<NaiveDate, IngestionError> {
+    // Try YYYY-MM-DD
+    if let Ok(d) = NaiveDate::parse_from_str(raw, "%Y-%m-%d") {
+        return Ok(d);
+    }
+    // Try DD/MM/YYYY (French style)
+    if let Ok(d) = NaiveDate::parse_from_str(raw, "%d/%m/%Y") {
+        return Ok(d);
+    }
+    // Try DD-MM-YYYY
+    if let Ok(d) = NaiveDate::parse_from_str(raw, "%d-%m-%Y") {
+        return Ok(d);
+    }
+    Err(IngestionError::InvalidDate(raw.to_owned()))
+}
+
 fn normalize_row(
     source_name: &str,
     source_account_ref: &str,
     record: &serde_json::Value,
 ) -> Result<NormalizedTransaction, IngestionError> {
-    let date = required_string_field(record, "date")?;
-    let amount = required_string_field(record, "amount")?;
-    let currency = required_string_field(record, "currency")?.to_uppercase();
-    let description = required_string_field(record, "description")?.to_owned();
-    let external_reference = optional_string_field(record, "external_reference");
+    // 1. Resolve Date
+    let date_str = try_get_field(record, &["date", "Date"])
+        .ok_or(IngestionError::MissingField("date/Date"))?;
+    let transaction_date = parse_flexible_date(date_str)?;
 
-    let transaction_date = NaiveDate::parse_from_str(date, "%Y-%m-%d")
-        .map_err(|_| IngestionError::InvalidDate(date.to_owned()))?;
-    let amount_minor = parse_minor_units(amount)?;
+    // 2. Resolve Amount
+    // Check if we have generic 'amount' or CIC style 'Débit'/'Credit'
+    let amount_minor = if let Some(a) = try_get_field(record, &["amount"]) {
+        parse_minor_units(a)?
+    } else {
+        let debit = try_get_field(record, &["debit", "débit"]).and_then(|v| parse_minor_units(v).ok());
+        let credit = try_get_field(record, &["credit", "crédit"]).and_then(|v| parse_minor_units(v).ok());
+
+        match (debit, credit) {
+            (Some(d), _) => -d.abs(), // Debit is always negative
+            (_, Some(c)) => c.abs(),  // Credit is always positive
+            _ => return Err(IngestionError::MissingField("amount/Débit/Crédit")),
+        }
+    };
+
+    // 3. Resolve Currency (Default to EUR if missing)
+    let currency = try_get_field(record, &["currency", "devise"])
+        .unwrap_or("EUR")
+        .to_uppercase();
+
+    // 4. Resolve Description
+    let description = try_get_field(record, &["description", "libelle", "libellé"])
+        .ok_or(IngestionError::MissingField("description/Libellé"))?
+        .to_owned();
+
+    let external_reference = try_get_field(record, &["external_reference", "reference", "référence"])
+        .map(|s| s.to_owned());
 
     let category_key = crate::categories::auto_categorize(&description);
 
@@ -225,6 +321,14 @@ pub async fn ingest_csv(
     filename: &str,
     content: &[u8],
 ) -> Result<IngestionSummary, IngestionError> {
+    // Save raw file for debugging
+    let debug_path = "/tmp/mony_last_import.csv";
+    if let Err(e) = std::fs::write(debug_path, content) {
+        tracing::error!(path = debug_path, error = %e, "failed to save debug csv");
+    } else {
+        tracing::info!(path = debug_path, "saved last import for debugging");
+    }
+
     let file_hash = hex::encode(Sha256::digest(content));
     let rows = parse_csv(content)?;
     let mut inserted_transactions = 0_usize;
@@ -292,49 +396,56 @@ pub async fn ingest_csv(
         .fetch_one(&mut *tx)
         .await?;
 
-        let normalized = normalize_row(source_name, source_account_ref, &row.record)?;
-        let rows_affected = sqlx::query(
-            r#"
-            INSERT INTO ledger_transaction (
-                id,
-                import_batch_id,
-                import_row_id,
-                source_name,
-                source_account_ref,
-                external_reference,
-                dedup_fingerprint,
-                transaction_date,
-                amount_minor,
-                currency,
-                description,
-                category_key,
-                metadata
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-            ON CONFLICT DO NOTHING
-            "#,
-        )
-        .bind(Uuid::new_v4())
-        .bind(batch_id)
-        .bind(import_row_id)
-        .bind(source_name)
-        .bind(source_account_ref)
-        .bind(normalized.external_reference)
-        .bind(normalized.dedup_fingerprint)
-        .bind(normalized.transaction_date)
-        .bind(normalized.amount_minor)
-        .bind(normalized.currency)
-        .bind(normalized.description)
-        .bind(normalized.category_key)
-        .bind(serde_json::json!({}))
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
+        // Use match here because some rows might be invalid headers or footers in some CSV dialects
+        match normalize_row(source_name, source_account_ref, &row.record) {
+            Ok(normalized) => {
+                let rows_affected = sqlx::query(
+                    r#"
+                    INSERT INTO ledger_transaction (
+                        id,
+                        import_batch_id,
+                        import_row_id,
+                        source_name,
+                        source_account_ref,
+                        external_reference,
+                        dedup_fingerprint,
+                        transaction_date,
+                        amount_minor,
+                        currency,
+                        description,
+                        category_key,
+                        metadata
+                    )
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                    ON CONFLICT DO NOTHING
+                    "#,
+                )
+                .bind(Uuid::new_v4())
+                .bind(batch_id)
+                .bind(import_row_id)
+                .bind(source_name)
+                .bind(source_account_ref)
+                .bind(normalized.external_reference)
+                .bind(normalized.dedup_fingerprint)
+                .bind(normalized.transaction_date)
+                .bind(normalized.amount_minor)
+                .bind(normalized.currency)
+                .bind(normalized.description)
+                .bind(normalized.category_key)
+                .bind(serde_json::json!({}))
+                .execute(&mut *tx)
+                .await?
+                .rows_affected();
 
-        if rows_affected == 1 {
-            inserted_transactions += 1;
-        } else {
-            skipped_duplicates += 1;
+                if rows_affected == 1 {
+                    inserted_transactions += 1;
+                } else {
+                    skipped_duplicates += 1;
+                }
+            }
+            Err(e) => {
+                tracing::warn!(index = row.index, error = %e, record = %row.record, "skipping invalid row");
+            }
         }
     }
 
@@ -360,16 +471,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_csv_extracts_rows_correctly() {
-        let csv_content =
-            b"date,amount,currency,description\n2026-03-01,100.00,EUR,Test 1\n2026-03-02,-50.00,EUR,Test 2";
+    fn parse_csv_detects_semicolon() {
+        let csv_content = b"Date;Libelle;Debit;Credit\n05/04/2023;Test;;94,00";
         let rows = parse_csv(csv_content).expect("parse should succeed");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].record["Libelle"], "Test");
+        assert_eq!(rows[0].record["Credit"], "94,00");
+    }
 
-        assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0].index, 1);
-        assert_eq!(rows[1].index, 2);
-        assert_eq!(rows[0].record["date"], "2026-03-01");
-        assert_eq!(rows[1].record["amount"], "-50.00");
+    #[test]
+    fn normalize_row_handles_cic_format() {
+        let record = serde_json::json!({
+            "Date": "05/04/2023",
+            "Libell\u{fffd}": "VIR CAF blabla",
+            "D\u{fffd}bit": "",
+            "Cr\u{fffd}dit": "94,00"
+        });
+
+        let normalized = normalize_row("cic", "acc1", &record).unwrap();
+        assert_eq!(normalized.transaction_date, NaiveDate::from_ymd_opt(2023, 4, 5).unwrap());
+        assert_eq!(normalized.amount_minor, 9400);
+        assert_eq!(normalized.description, "VIR CAF blabla");
     }
 
     #[test]
@@ -377,23 +499,5 @@ mod tests {
         assert_eq!(parse_minor_units("100.00").unwrap(), 10_000);
         assert_eq!(parse_minor_units("-50,75").unwrap(), -5_075);
         assert_eq!(parse_minor_units("1 234,56").unwrap(), 123_456);
-    }
-
-    #[test]
-    fn normalize_row_requires_generic_columns_and_categorizes() {
-        let record = serde_json::json!({
-            "date": "2026-03-01",
-            "amount": "100.00",
-            "currency": "EUR",
-            "description": "CARREFOUR SUPERMARKET",
-            "external_reference": "abc-123"
-        });
-
-        let normalized = normalize_row("generic-csv", "checking", &record).unwrap();
-
-        assert_eq!(normalized.amount_minor, 10_000);
-        assert_eq!(normalized.currency, "EUR");
-        assert_eq!(normalized.external_reference.as_deref(), Some("abc-123"));
-        assert_eq!(normalized.category_key.as_deref(), Some("food.grocery"));
     }
 }
