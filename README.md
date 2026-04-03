@@ -39,7 +39,19 @@ The next product slices are centered on data stewardship and day-to-day usabilit
 - **Transaction Refinement**: Improve transaction editing, especially category and description management.
 - **Dashboard Time Windows**: Add selectable periods to make summaries useful over different ranges.
 - **Analytics Alignment**: Clarify the boundary between dashboard summaries and analytics views so they do not overlap awkwardly.
+- **Smarter Categorization**: Improve category quality by first exploiting the current database and local deterministic rules, then adding learning from confirmed user decisions, and finally using AI only for the unresolved tail.
 - **Authentication Later**: Authentication is intentionally deferred until the functional core is in place, but new backend and frontend work should avoid assumptions that would make route protection or user scoping hard to add later.
+
+## Categorization Strategy
+
+The categorization engine should evolve in layers instead of jumping directly to a black-box classifier:
+
+1. **Current Data First**: Use the existing database to review weak tags, identify repeated merchants or normalized descriptions, and derive better local rules from what is already present.
+2. **Deterministic Rules**: Keep a transparent rules layer based on normalized descriptions, source metadata, amount patterns, and explicit category mappings.
+3. **Learning From History**: Reuse confirmed user categorizations to improve suggestions over time, especially for repeated merchants and recurring transactions.
+4. **AI For The Residual Cases**: Add AI only after the local and historical layers are in place, to propose categories for ambiguous or unseen transactions.
+
+This order is intentional: the project should first become materially better with the data it already owns before depending on external intelligence.
 
 ## Tech Stack
 
