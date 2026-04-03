@@ -16,18 +16,19 @@ function getInitialPreference(): ThemePreference {
   return 'system';
 }
 
+function resolveTheme(preference: ThemePreference): Theme {
+  return preference === 'system' ? getSystemTheme() : preference;
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [preference, setPreference] = React.useState<ThemePreference>(getInitialPreference());
-  const initialPreference = getInitialPreference();
-  const initialTheme: Theme =
-    initialPreference === 'system' ? getSystemTheme() : initialPreference;
-  const [theme, setTheme] = React.useState<Theme>(initialTheme);
+  const [preference, setPreference] = React.useState<ThemePreference>(getInitialPreference);
+  const [theme, setTheme] = React.useState<Theme>(() => resolveTheme(getInitialPreference()));
 
   React.useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, preference);
 
     if (preference !== 'system') {
-      setTheme(preference);
+      setTheme(resolveTheme(preference));
     }
   }, [preference]);
 
