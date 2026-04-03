@@ -75,11 +75,19 @@ const Categorize: React.FC = () => {
       return;
     }
 
+    const shouldReloadQueue = queue.length <= 1;
+
     setSavingKey(categoryKey ?? '__uncategorized__');
     setError(null);
 
     try {
       await api.updateTransaction(current.id, { category_key: categoryKey });
+
+      if (shouldReloadQueue) {
+        await loadQueue();
+        return;
+      }
+
       setQueue((previous) => previous.filter((transaction) => transaction.id !== current.id));
       setRemaining((previous) => Math.max(0, previous - 1));
       setIndex((previous) => Math.max(0, Math.min(previous, queue.length - 2)));
