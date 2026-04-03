@@ -68,7 +68,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <span className="mobile-logo">mony</span>
           <div className="mobile-header-copy">
             <strong>{currentNavItem.name}</strong>
-            <span>Personal finance, optimized for mobile</span>
           </div>
         </div>
       </header>
