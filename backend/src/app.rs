@@ -9,7 +9,7 @@ use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    analytics::{get_spending_by_category, AnalyticsResponse},
+    analytics::{get_spending_by_category, AnalyticsError, AnalyticsParams, AnalyticsResponse},
     categories::{list_categories, Category},
     imports::{
         delete_import, list_imports, DeleteImportResponse, ImportBatchListResponse,
@@ -59,10 +59,11 @@ pub fn build_router(state: AppState) -> Router {
 
 async fn get_analytics_spending(
     State(state): State<AppState>,
+    Query(params): Query<AnalyticsParams>,
 ) -> Result<Json<AnalyticsResponse>, (StatusCode, String)> {
-    let response = get_spending_by_category(&state.db)
+    let response = get_spending_by_category(&state.db, params)
         .await
-        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+        .map_err(map_analytics_error)?;
 
     Ok(Json(response))
 }
@@ -200,6 +201,13 @@ fn map_import_management_error(error: ImportManagementError) -> (StatusCode, Str
         ImportManagementError::Database(error) => {
             (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
         }
+    }
+}
+
+fn map_analytics_error(error: AnalyticsError) -> (StatusCode, String) {
+    match error {
+        AnalyticsError::Validation(message) => (StatusCode::BAD_REQUEST, message),
+        AnalyticsError::Database(error) => (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
 }
 

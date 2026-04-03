@@ -45,7 +45,7 @@ This file tracks the progress of the **mony** project.
 - [x] Import management: list imports with source metadata and support deletion flows
 - [x] Import management: define deletion semantics for batches and related transactions
 - [x] Transaction editing: support category and description management with clear validation rules
-- [ ] Dashboard: add selectable periods for summary views
+- [x] Dashboard: add selectable periods for summary views
 - [ ] Product/UI: separate dashboard summaries from deeper analytics flows
 - [ ] Prepare authentication-friendly boundaries without implementing auth yet
 

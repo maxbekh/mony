@@ -92,6 +92,11 @@ export interface SpendingByCategory {
   transaction_count: number;
 }
 
+export interface AnalyticsQueryParams {
+  date_from?: string;
+  date_to?: string;
+}
+
 export interface AnalyticsResponse {
   spending_by_category: SpendingByCategory[];
 }

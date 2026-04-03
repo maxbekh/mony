@@ -8,6 +8,7 @@ import type {
   ImportResponse,
   ImportBatchListResponse,
   DeleteImportResponse,
+  AnalyticsQueryParams,
   AnalyticsResponse,
   StatusPayload,
 } from '../types';
@@ -47,8 +48,10 @@ export const api = {
     return data;
   },
 
-  getAnalyticsSpending: async () => {
-    const { data } = await client.get<AnalyticsResponse>('/v1/analytics/spending-by-category');
+  getAnalyticsSpending: async (params: AnalyticsQueryParams = {}) => {
+    const { data } = await client.get<AnalyticsResponse>('/v1/analytics/spending-by-category', {
+      params,
+    });
     return data;
   },
 
