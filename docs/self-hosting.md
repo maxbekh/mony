@@ -17,7 +17,15 @@ The frontend container reverse-proxies `/health`, `/ready`, and `/v1/*` to the b
 
 1. Copy `.env.example` to `.env`.
 2. Replace `POSTGRES_PASSWORD` with a long random password.
-3. Review the remaining values before first boot.
+3. Generate a local JWT signing keypair:
+
+```bash
+mkdir -p .local/keys
+openssl genrsa -out .local/keys/mony-jwt-private.pem 2048
+openssl rsa -in .local/keys/mony-jwt-private.pem -pubout -out .local/keys/mony-jwt-public.pem
+```
+
+4. Review the remaining values before first boot.
 
 Available environment variables:
 
@@ -38,7 +46,8 @@ Available environment variables:
 
 Authentication notes:
 
-- Generate an RSA keypair and mount both files into the backend container. The backend signs short-lived JWT access tokens with the private key and publishes the public key through `/.well-known/jwks.json`.
+- The default compose setup mounts `./.local/keys` into the backend container at `/run/secrets`.
+- The backend signs short-lived JWT access tokens with the private key and publishes the public key through `/.well-known/jwks.json`.
 - The first account is created through the one-time bootstrap flow exposed at `POST /v1/auth/bootstrap` while no account exists. Public registration is intentionally disabled after that.
 - For production, terminate TLS in front of the app and set `MONY_AUTH_SECURE_COOKIES=true`.
 
