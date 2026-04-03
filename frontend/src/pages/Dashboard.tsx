@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { CalendarRange, PieChart, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
-import type { AnalyticsQueryParams, SpendingByCategory } from '../types';
+import type { AnalyticsQueryParams, Category, SpendingByCategory } from '../types';
 
 type PeriodKey = '30d' | '90d' | '12m' | 'all';
 
@@ -58,6 +59,7 @@ function buildAnalyticsParams(period: PeriodKey): AnalyticsQueryParams {
 const Dashboard: React.FC = () => {
   const [period, setPeriod] = useState<PeriodKey>('30d');
   const [analytics, setAnalytics] = useState<SpendingByCategory[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,8 +69,12 @@ const Dashboard: React.FC = () => {
       setError(null);
 
       try {
-        const data = await api.getAnalyticsSpending(buildAnalyticsParams(period));
+        const [data, categoryData] = await Promise.all([
+          api.getAnalyticsSpending(buildAnalyticsParams(period)),
+          api.getCategories(),
+        ]);
         setAnalytics(data.spending_by_category);
+        setCategories(categoryData);
       } catch (fetchError) {
         setError(getErrorMessage(fetchError, 'Failed to fetch dashboard data.'));
       } finally {
@@ -104,6 +110,10 @@ const Dashboard: React.FC = () => {
       currency,
     }).format(amountMinor / 100);
 
+  const categoryLabels = new Map(categories.map((category) => [category.key, category.label]));
+  const getCategoryLabel = (categoryKey: string | null) =>
+    categoryKey ? categoryLabels.get(categoryKey) ?? categoryKey : 'Uncategorized';
+
   return (
     <div className="page">
       <div className="page-header">
@@ -112,18 +122,23 @@ const Dashboard: React.FC = () => {
           <p className="text-muted">Short-range overview of your financial activity.</p>
         </div>
 
-        <div className="period-selector" aria-label="Select dashboard period">
-          {PERIOD_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              className={`period-chip ${period === option.key ? 'active' : ''}`}
-              onClick={() => setPeriod(option.key)}
-              title={option.description}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="header-actions">
+          <div className="period-selector" aria-label="Select dashboard period">
+            {PERIOD_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                className={`period-chip ${period === option.key ? 'active' : ''}`}
+                onClick={() => setPeriod(option.key)}
+                title={option.description}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <Link to="/analytics" className="analytics-link">
+            Open analytics
+          </Link>
         </div>
       </div>
 
@@ -188,9 +203,9 @@ const Dashboard: React.FC = () => {
                     totalSpending === 0 ? 0 : (Math.abs(item.total_amount_minor) / totalSpending) * 100;
 
                   return (
-                    <div key={item.category_key || 'other'} className="category-item">
+                      <div key={item.category_key || 'other'} className="category-item">
                       <div className="category-info">
-                        <span className="category-name">{item.category_key || 'Uncategorized'}</span>
+                        <span className="category-name">{getCategoryLabel(item.category_key)}</span>
                         <span className="category-amount">
                           {formatAmount(Math.abs(item.total_amount_minor), item.currency)}
                         </span>
@@ -241,7 +256,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="insight-row">
                   <span>Largest category</span>
-                  <strong>{topCategories[0]?.category_key || 'None'}</strong>
+                  <strong>{topCategories[0] ? getCategoryLabel(topCategories[0].category_key) : 'None'}</strong>
                 </div>
               </>
             )}
@@ -262,6 +277,13 @@ const Dashboard: React.FC = () => {
           gap: 1rem;
           flex-wrap: wrap;
         }
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
         .period-selector {
           display: flex;
           gap: 0.75rem;
@@ -280,6 +302,19 @@ const Dashboard: React.FC = () => {
           background: var(--primary-color);
           border-color: var(--primary-color);
           color: white;
+        }
+        .analytics-link {
+          display: inline-flex;
+          align-items: center;
+          min-height: 2.5rem;
+          padding: 0 0.95rem;
+          border-radius: 999px;
+          border: 1px solid var(--border-color);
+          background: white;
+          color: var(--text-main);
+          text-decoration: none;
+          font-size: 0.875rem;
+          font-weight: 500;
         }
         .notice {
           padding: 0.875rem 1rem;

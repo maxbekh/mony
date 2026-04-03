@@ -46,7 +46,7 @@ This file tracks the progress of the **mony** project.
 - [x] Import management: define deletion semantics for batches and related transactions
 - [x] Transaction editing: support category and description management with clear validation rules
 - [x] Dashboard: add selectable periods for summary views
-- [ ] (IN PROGRESS - @codex) Product/UI: separate dashboard summaries from deeper analytics flows
+- [x] Product/UI: separate dashboard summaries from deeper analytics flows
 - [x] Transactions UX: add faster categorization and better sort/filter controls
 - [ ] Prepare authentication-friendly boundaries without implementing auth yet
 
