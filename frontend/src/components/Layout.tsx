@@ -21,6 +21,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const currentNavItem = navItems.find((item) => item.path === location.pathname) ?? navItems[0];
 
   React.useEffect(() => {
+    document.title = `mony - ${currentNavItem.name}`;
+  }, [currentNavItem.name]);
+
+  React.useEffect(() => {
     const handleScroll = () => {
       if (window.innerWidth > 768) {
         setIsMobileChromeHidden(false);
