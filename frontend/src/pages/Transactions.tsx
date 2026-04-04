@@ -667,6 +667,11 @@ const Transactions: React.FC = () => {
           gap: 0.5rem;
           min-height: 2.75rem;
           overflow: hidden;
+          transition: border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+        .search-form:focus-within {
+          border-color: color-mix(in srgb, var(--primary-color) 35%, var(--border-color));
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 14%, transparent);
         }
         .search-icon {
           color: var(--text-muted);
@@ -679,6 +684,15 @@ const Transactions: React.FC = () => {
           font-size: 0.875rem;
           width: 100%;
           align-self: stretch;
+          min-width: 0;
+          background: transparent;
+          color: var(--text-main);
+          appearance: none;
+          -webkit-appearance: none;
+          box-shadow: none;
+        }
+        .search-input::placeholder {
+          color: var(--text-muted);
         }
         .filter-grid {
           display: grid;
@@ -970,6 +984,12 @@ const Transactions: React.FC = () => {
           min-height: 2.75rem;
           padding-left: 1rem;
           padding-right: 1rem;
+          border-top: none;
+          border-right: none;
+          border-bottom: none;
+          border-left: 1px solid var(--border-color);
+          box-shadow: none;
+          flex-shrink: 0;
         }
         .quick-link {
           flex-shrink: 0;
