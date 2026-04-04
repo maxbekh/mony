@@ -1,6 +1,15 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { KeyRound, LayoutDashboard, PieChart, Receipt, Tags, Upload } from 'lucide-react';
+import {
+  Ellipsis,
+  KeyRound,
+  LayoutDashboard,
+  PieChart,
+  Receipt,
+  Tags,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 
 interface LayoutProps {
@@ -11,22 +20,30 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [isMobileChromeHidden, setIsMobileChromeHidden] = React.useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const lastScrollYRef = React.useRef(0);
   const appVersionLabel = `${__APP_VERSION__} (${__APP_BUILD__})`;
 
   const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Transactions', path: '/transactions', icon: Receipt },
-    { name: 'Categorize', path: '/categorize', icon: Tags },
-    { name: 'Import', path: '/import', icon: Upload },
-    { name: 'Analytics', path: '/analytics', icon: PieChart },
-    { name: 'Settings', path: '/settings', icon: KeyRound },
+    { name: 'Dashboard', path: '/', icon: LayoutDashboard, mobilePriority: true },
+    { name: 'Transactions', path: '/transactions', icon: Receipt, mobilePriority: true },
+    { name: 'Categorize', path: '/categorize', icon: Tags, mobilePriority: true },
+    { name: 'Import', path: '/import', icon: Upload, mobilePriority: false },
+    { name: 'Analytics', path: '/analytics', icon: PieChart, mobilePriority: true },
+    { name: 'Settings', path: '/settings', icon: KeyRound, mobilePriority: false },
   ];
+  const mobilePrimaryNavItems = navItems.filter((item) => item.mobilePriority);
+  const mobileSecondaryNavItems = navItems.filter((item) => !item.mobilePriority);
   const currentNavItem = navItems.find((item) => item.path === location.pathname) ?? navItems[0];
+  const isCurrentItemInMoreMenu = mobileSecondaryNavItems.some((item) => item.path === location.pathname);
 
   React.useEffect(() => {
     document.title = `mony - ${currentNavItem.name}`;
   }, [currentNavItem.name]);
+
+  React.useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -142,11 +159,59 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       <main className="main-content">{children}</main>
 
+      {isMobileMenuOpen ? (
+        <button
+          type="button"
+          className="mobile-menu-backdrop"
+          aria-label="Close navigation menu"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      ) : null}
+
+      <div
+        id="mobile-navigation-more"
+        className={`mobile-menu-sheet ${isMobileMenuOpen ? 'open' : ''}`}
+        aria-hidden={!isMobileMenuOpen}
+      >
+        <div className="mobile-menu-sheet-header">
+          <div>
+            <strong>More</strong>
+            <span>Secondary navigation and account actions</span>
+          </div>
+          <button
+            type="button"
+            className="mobile-menu-close"
+            aria-label="Close navigation menu"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <nav className="mobile-menu-list" aria-label="More">
+          {mobileSecondaryNavItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`mobile-menu-item ${location.pathname === item.path ? 'active' : ''}`}
+              aria-current={location.pathname === item.path ? 'page' : undefined}
+            >
+              <item.icon size={18} />
+              <span>{item.name}</span>
+            </Link>
+          ))}
+        </nav>
+
+        <button className="mobile-menu-signout" onClick={() => void logout()} type="button">
+          Sign out
+        </button>
+      </div>
+
       <nav
         className={`mobile-tabbar ${isMobileChromeHidden ? 'hidden' : ''}`}
         aria-label="Primary"
       >
-        {navItems.map((item) => (
+        {mobilePrimaryNavItems.map((item) => (
           <Link
             key={item.path}
             to={item.path}
@@ -157,6 +222,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <span>{item.name}</span>
           </Link>
         ))}
+
+        <button
+          type="button"
+          className={`mobile-tab mobile-tab-button ${isMobileMenuOpen || isCurrentItemInMoreMenu ? 'active' : ''}`}
+          aria-expanded={isMobileMenuOpen}
+          aria-controls="mobile-navigation-more"
+          onClick={() => setIsMobileMenuOpen((current) => !current)}
+        >
+          <Ellipsis size={18} />
+          <span>More</span>
+        </button>
       </nav>
     </div>
   );

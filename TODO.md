@@ -56,6 +56,7 @@ This file tracks the progress of the **mony** project.
 - [x] Product/UI: add system-aware dark mode with explicit light/dark override support
 - [x] Product/UI: rename Account to Settings and consolidate appearance, password, session, and security activity flows
 - [x] Product planning: define intelligent dashboard goals, default widgets, and configurable layout principles
+- [x] Product/UI: simplify overloaded mobile navigation with prioritized tabs and a secondary menu
 
 ## Phase 4: Authentication & Authorization
 
