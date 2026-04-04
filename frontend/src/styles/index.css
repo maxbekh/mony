@@ -571,6 +571,48 @@ textarea {
   background: var(--surface-hover);
 }
 
+.auth-divider {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: 0.25rem 0;
+}
+
+.auth-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.auth-divider span {
+  position: relative;
+  padding: 0 0.75rem;
+  background: var(--surface-elevated);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.auth-secondary-submit {
+  border: 1px solid var(--border-color);
+  border-radius: 0.95rem;
+  background: var(--surface-color);
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 700;
+  padding: 0.95rem 1rem;
+  cursor: pointer;
+}
+
+.auth-secondary-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .settings-form {
   display: grid;
   gap: 1rem;
@@ -614,6 +656,38 @@ textarea {
 }
 
 .activity-copy p {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.passkey-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.passkey-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background:
+    var(--surface-reflection),
+    var(--surface-muted);
+}
+
+.passkey-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.passkey-copy strong {
+  font-size: 0.95rem;
+}
+
+.passkey-copy p {
   color: var(--text-muted);
   font-size: 0.86rem;
 }

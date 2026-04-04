@@ -140,6 +140,10 @@ Then edit `.env` and at minimum replace:
 - `MONY_AUTH_SECURE_COOKIES`
   - keep `false` for local HTTP development
   - switch to `true` behind HTTPS in production
+- `MONY_AUTH_WEBAUTHN_RP_ID`
+- `MONY_AUTH_WEBAUTHN_RP_ORIGIN`
+  - for local Docker Compose this should usually be `http://localhost`
+  - the origin must exactly match the web app origin seen by the browser
 
 The default `.env.example` already points to host-local key paths:
 
@@ -164,7 +168,7 @@ Then open:
 On first launch, browse to the web app and create the initial administrator account through the bootstrap login screen. Public registration is disabled after that first account exists.
 
 After sign-in, password changes are available from the `Settings` page in the web app.
-Recent security activity is also visible from the same page, including sign-ins, failed sign-ins, password changes, and forced resets.
+Recent security activity is also visible from the same page, including sign-ins, failed sign-ins, passkey activity, password changes, and forced resets.
 
 ### 4. Stop the stack
 

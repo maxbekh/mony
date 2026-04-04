@@ -11,6 +11,7 @@ const DEFAULT_AUTH_AUDIENCE: &str = "mony-api";
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS: i64 = 600;
 const DEFAULT_REFRESH_TOKEN_TTL_DAYS: i64 = 30;
 const DEFAULT_SECURE_COOKIES: bool = false;
+const DEFAULT_WEBAUTHN_RP_NAME: &str = "mony";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppConfig {
@@ -38,6 +39,9 @@ pub struct AuthConfig {
     pub access_token_ttl_seconds: i64,
     pub refresh_token_ttl_days: i64,
     pub secure_cookies: bool,
+    pub webauthn_rp_id: String,
+    pub webauthn_rp_origin: String,
+    pub webauthn_rp_name: String,
 }
 
 impl AppConfig {
@@ -107,6 +111,16 @@ impl AppConfig {
                 lookup("MONY_AUTH_SECURE_COOKIES"),
                 DEFAULT_SECURE_COOKIES,
             )?,
+            webauthn_rp_id: lookup("MONY_AUTH_WEBAUTHN_RP_ID").ok_or(ConfigError::MissingEnv {
+                key: "MONY_AUTH_WEBAUTHN_RP_ID",
+            })?,
+            webauthn_rp_origin: lookup("MONY_AUTH_WEBAUTHN_RP_ORIGIN").ok_or(
+                ConfigError::MissingEnv {
+                    key: "MONY_AUTH_WEBAUTHN_RP_ORIGIN",
+                },
+            )?,
+            webauthn_rp_name: lookup("MONY_AUTH_WEBAUTHN_RP_NAME")
+                .unwrap_or_else(|| DEFAULT_WEBAUTHN_RP_NAME.to_owned()),
         };
 
         Ok(Self {
@@ -187,6 +201,8 @@ mod tests {
             "POSTGRES_PASSWORD" => Some("test-password".to_owned()),
             "MONY_AUTH_JWT_PRIVATE_KEY_PATH" => Some("/tmp/private.pem".to_owned()),
             "MONY_AUTH_JWT_PUBLIC_KEY_PATH" => Some("/tmp/public.pem".to_owned()),
+            "MONY_AUTH_WEBAUTHN_RP_ID" => Some("localhost".to_owned()),
+            "MONY_AUTH_WEBAUTHN_RP_ORIGIN" => Some("http://localhost:5173".to_owned()),
             _ => None,
         })
         .expect("config should use defaults");
@@ -211,6 +227,9 @@ mod tests {
                     access_token_ttl_seconds: 600,
                     refresh_token_ttl_days: 30,
                     secure_cookies: false,
+                    webauthn_rp_id: "localhost".to_owned(),
+                    webauthn_rp_origin: "http://localhost:5173".to_owned(),
+                    webauthn_rp_name: "mony".to_owned(),
                 },
             }
         );
@@ -226,6 +245,8 @@ mod tests {
             "POSTGRES_PASSWORD" => Some("test-password".to_owned()),
             "MONY_AUTH_JWT_PRIVATE_KEY_PATH" => Some("/tmp/private.pem".to_owned()),
             "MONY_AUTH_JWT_PUBLIC_KEY_PATH" => Some("/tmp/public.pem".to_owned()),
+            "MONY_AUTH_WEBAUTHN_RP_ID" => Some("localhost".to_owned()),
+            "MONY_AUTH_WEBAUTHN_RP_ORIGIN" => Some("http://localhost:5173".to_owned()),
             _ => None,
         })
         .expect_err("invalid MONY_PORT should fail");

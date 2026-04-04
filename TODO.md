@@ -72,6 +72,7 @@ This file tracks the progress of the **mony** project.
 - [ ] **(Task 4.10)** Extend auth audit coverage and add filtering/pagination in Settings
 - [ ] **(Task 4.11)** Add MFA/TOTP support and recovery code flows
 - [ ] **(Task 4.12)** Prepare explicit OIDC identity mapping (`issuer` / `sub`) and provider integration boundaries
+- [x] **(Task 4.13)** Add passkey/WebAuthn enrollment and sign-in without changing JWT/session boundaries
 
 ## Phase 5: Dashboard Intelligence & Personalization
 

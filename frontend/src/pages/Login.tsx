@@ -2,6 +2,7 @@ import React from 'react';
 import axios from 'axios';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { passkeysSupported } from '../auth/passkeys';
 
 function formatError(error: unknown) {
   if (axios.isAxiosError(error)) {
@@ -18,15 +19,21 @@ function formatError(error: unknown) {
     return 'Unable to sign in.';
   }
 
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
   return 'Unable to sign in.';
 }
 
 export default function Login() {
-  const { status, bootstrapRequired, login, bootstrap } = useAuth();
+  const { status, bootstrapRequired, login, loginWithPasskey, bootstrap } = useAuth();
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isPasskeySubmitting, setIsPasskeySubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const canUsePasskeys = !bootstrapRequired && passkeysSupported();
 
   if (status === 'authenticated') {
     return <Navigate to="/" replace />;
@@ -47,6 +54,19 @@ export default function Login() {
       setErrorMessage(formatError(error));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handlePasskeySignIn = async () => {
+    setIsPasskeySubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await loginWithPasskey(username);
+    } catch (error) {
+      setErrorMessage(formatError(error));
+    } finally {
+      setIsPasskeySubmitting(false);
     }
   };
 
@@ -107,6 +127,22 @@ export default function Login() {
           <button className="auth-submit" disabled={isSubmitting} type="submit">
             {isSubmitting ? 'Please wait…' : bootstrapRequired ? 'Create administrator' : 'Sign in'}
           </button>
+
+          {canUsePasskeys ? (
+            <>
+              <div className="auth-divider" aria-hidden="true">
+                <span>or</span>
+              </div>
+              <button
+                className="auth-secondary-submit"
+                disabled={isPasskeySubmitting || !username.trim()}
+                onClick={() => void handlePasskeySignIn()}
+                type="button"
+              >
+                {isPasskeySubmitting ? 'Waiting for passkey…' : 'Use passkey'}
+              </button>
+            </>
+          ) : null}
         </form>
       </div>
     </div>

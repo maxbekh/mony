@@ -38,6 +38,9 @@ Available environment variables:
 - `MONY_AUTH_ACCESS_TOKEN_TTL_SECONDS`
 - `MONY_AUTH_REFRESH_TOKEN_TTL_DAYS`
 - `MONY_AUTH_SECURE_COOKIES`
+- `MONY_AUTH_WEBAUTHN_RP_ID`
+- `MONY_AUTH_WEBAUTHN_RP_ORIGIN`
+- `MONY_AUTH_WEBAUTHN_RP_NAME`
 - `POSTGRES_HOST`
 - `POSTGRES_PORT`
 - `POSTGRES_DB`
@@ -50,8 +53,10 @@ Authentication notes:
 - The default compose setup mounts `./.local/keys` into the backend container at `/run/secrets`.
 - Docker Compose overrides the backend JWT key paths internally so the same `.env` also works with `make run-backend` on the host.
 - The backend signs short-lived JWT access tokens with the private key and publishes the public key through `/.well-known/jwks.json`.
+- `MONY_AUTH_WEBAUTHN_RP_ID` is the relying-party domain that passkeys bind to and should be treated as durable.
+- `MONY_AUTH_WEBAUTHN_RP_ORIGIN` must exactly match the browser-visible web origin, for example `https://app.example.com`.
 - The first account is created through the one-time bootstrap flow exposed at `POST /v1/auth/bootstrap` while no account exists. Public registration is intentionally disabled after that.
-- Signed-in users can change their password from the web `Settings` page.
+- Signed-in users can change their password and enroll passkeys from the web `Settings` page.
 - The web `Settings` page also shows recent security activity recorded by the backend.
 - If recovery is needed and you have server access, use `cargo run -p mony-backend -- reset-password <username>` to set a new password and revoke existing sessions.
 - For production, terminate TLS in front of the app and set `MONY_AUTH_SECURE_COOKIES=true`.

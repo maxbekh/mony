@@ -2,19 +2,24 @@ import React from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { createPasskey, fallbackPasskeyLabel, passkeysSupported } from '../auth/passkeys';
 import { api } from '../services/api';
 import { useTheme } from '../theme/useTheme';
 import type { ThemePreference } from '../theme/context';
-import type { AuthEvent } from '../types';
+import type { AuthEvent, Passkey } from '../types';
 
 function formatError(error: unknown) {
   if (axios.isAxiosError(error)) {
     return typeof error.response?.data === 'string'
       ? error.response.data
-      : 'Unable to update password.';
+      : 'Unable to complete security action.';
   }
 
-  return 'Unable to update password.';
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return 'Unable to complete security action.';
 }
 
 export default function Settings() {
@@ -22,36 +27,77 @@ export default function Settings() {
   const { logout, user } = useAuth();
   const { theme, preference, setPreference } = useTheme();
   const [events, setEvents] = React.useState<AuthEvent[]>([]);
+  const [passkeys, setPasskeys] = React.useState<Passkey[]>([]);
   const [eventsError, setEventsError] = React.useState<string | null>(null);
+  const [passkeysError, setPasskeysError] = React.useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = React.useState('');
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isRegisteringPasskey, setIsRegisteringPasskey] = React.useState(false);
+  const [passkeyLabel, setPasskeyLabel] = React.useState(fallbackPasskeyLabel());
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const passkeySupport = passkeysSupported();
 
   React.useEffect(() => {
     let cancelled = false;
 
-    const loadEvents = async () => {
+    const loadSecurityData = async () => {
       try {
-        const response = await api.listAuthEvents();
+        const [eventsResponse, passkeysResponse] = await Promise.all([
+          api.listAuthEvents(),
+          api.listPasskeys(),
+        ]);
         if (!cancelled) {
-          setEvents(response.items);
+          setEvents(eventsResponse.items);
+          setPasskeys(passkeysResponse.items);
           setEventsError(null);
+          setPasskeysError(null);
         }
       } catch {
         if (!cancelled) {
           setEventsError('Unable to load recent security activity.');
+          setPasskeysError('Unable to load saved passkeys.');
         }
       }
     };
 
-    void loadEvents();
+    void loadSecurityData();
 
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const handlePasskeyRegistration = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPasskeysError(null);
+    setIsRegisteringPasskey(true);
+
+    try {
+      const start = await api.startPasskeyRegistration(passkeyLabel);
+      const credential = await createPasskey(start.options);
+      await api.finishPasskeyRegistration(start.ceremony_id, credential);
+      const refreshed = await api.listPasskeys();
+      setPasskeys(refreshed.items);
+      setPasskeyLabel(fallbackPasskeyLabel());
+    } catch (error) {
+      setPasskeysError(formatError(error));
+    } finally {
+      setIsRegisteringPasskey(false);
+    }
+  };
+
+  const handleDeletePasskey = async (passkeyId: string) => {
+    setPasskeysError(null);
+
+    try {
+      await api.deletePasskey(passkeyId);
+      setPasskeys((current) => current.filter((passkey) => passkey.id !== passkeyId));
+    } catch (error) {
+      setPasskeysError(formatError(error));
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -114,6 +160,71 @@ export default function Settings() {
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="settings-form">
+        <div className="settings-block-header">
+          <div>
+            <span className="settings-eyebrow">Security</span>
+            <h2>Passkeys</h2>
+            <p className="settings-empty">
+              Add device-bound sign-in without changing the existing JWT or refresh-token model.
+            </p>
+          </div>
+        </div>
+
+        {passkeySupport ? (
+          <form className="auth-form" onSubmit={handlePasskeyRegistration}>
+            <label className="auth-field">
+              <span>Label</span>
+              <input
+                name="passkeyLabel"
+                type="text"
+                value={passkeyLabel}
+                onChange={(event) => setPasskeyLabel(event.target.value)}
+                placeholder="MacBook Air"
+                required
+              />
+            </label>
+
+            <button className="auth-secondary-submit" disabled={isRegisteringPasskey} type="submit">
+              {isRegisteringPasskey ? 'Waiting for passkey…' : 'Add passkey'}
+            </button>
+          </form>
+        ) : (
+          <p className="settings-empty">
+            This browser does not expose the WebAuthn APIs needed for passkeys.
+          </p>
+        )}
+
+        {passkeysError ? <p className="auth-error">{passkeysError}</p> : null}
+
+        {passkeys.length === 0 ? (
+          <p className="settings-empty">No passkeys saved yet.</p>
+        ) : (
+          <div className="passkey-list">
+            {passkeys.map((passkey) => (
+              <article className="passkey-item" key={passkey.id}>
+                <div className="passkey-copy">
+                  <strong>{passkey.label}</strong>
+                  <p>
+                    Added {new Date(passkey.created_at).toLocaleString()}
+                    {passkey.last_used_at
+                      ? ` · Used ${new Date(passkey.last_used_at).toLocaleString()}`
+                      : ' · Never used yet'}
+                  </p>
+                </div>
+                <button
+                  className="button-secondary-inline"
+                  type="button"
+                  onClick={() => void handleDeletePasskey(passkey.id)}
+                >
+                  Remove
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <form className="settings-form" onSubmit={handleSubmit}>
@@ -239,6 +350,14 @@ function labelForEvent(eventType: string) {
       return 'Session refreshed';
     case 'bootstrap':
       return 'Initial administrator created';
+    case 'passkey_registered':
+      return 'Passkey added';
+    case 'passkey_login':
+      return 'Signed in with passkey';
+    case 'passkey_deleted':
+      return 'Passkey removed';
+    case 'passkey_login_failed':
+      return 'Failed passkey sign-in attempt';
     default:
       return eventType.replaceAll('_', ' ');
   }

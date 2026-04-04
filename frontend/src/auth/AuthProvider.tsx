@@ -1,5 +1,6 @@
 import React from 'react';
 import axios from 'axios';
+import { authenticateWithPasskey } from './passkeys';
 import { api, authTokenStore } from '../services/api';
 import type { AuthSession, AuthUser } from '../types';
 import { AuthContext } from './context';
@@ -13,6 +14,7 @@ export interface AuthContextValue {
   session: AuthSession | null;
   scopes: string[];
   login: (username: string, password: string) => Promise<void>;
+  loginWithPasskey: (username: string) => Promise<void>;
   bootstrap: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -120,6 +122,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [applyAuthResponse],
   );
 
+  const loginWithPasskey = React.useCallback(
+    async (username: string) => {
+      const response = await api.startPasskeyLogin(username, DEVICE_NAME);
+      const credential = await authenticateWithPasskey(response.options);
+      const completed = await api.finishPasskeyLogin(response.ceremony_id, credential);
+      applyAuthResponse(completed);
+    },
+    [applyAuthResponse],
+  );
+
   const bootstrap = React.useCallback(
     async (username: string, password: string) => {
       const response = await api.bootstrap(username, password, DEVICE_NAME);
@@ -148,10 +160,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       scopes,
       login,
+      loginWithPasskey,
       bootstrap,
       logout,
     }),
-    [bootstrapRequired, bootstrap, login, logout, scopes, session, status, user],
+    [bootstrapRequired, bootstrap, login, loginWithPasskey, logout, scopes, session, status, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

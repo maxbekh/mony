@@ -1,6 +1,9 @@
 import axios from 'axios';
 import type {
   AuthEventListResponse,
+  PasskeyAuthenticationStartResponse,
+  PasskeyListResponse,
+  PasskeyRegistrationStartResponse,
   AuthSessionViewResponse,
   AuthTokenPairResponse,
   BootstrapStatusResponse,
@@ -124,6 +127,54 @@ export const api = {
     const { data } = await client.get<AuthEventListResponse>('/v1/auth/events', {
       params: { limit },
     });
+    return data;
+  },
+
+  listPasskeys: async () => {
+    const { data } = await client.get<PasskeyListResponse>('/v1/auth/passkeys');
+    return data;
+  },
+
+  startPasskeyRegistration: async (label: string) => {
+    const { data } = await client.post<PasskeyRegistrationStartResponse>(
+      '/v1/auth/passkeys/register/start',
+      { label },
+    );
+    return data;
+  },
+
+  finishPasskeyRegistration: async (ceremonyId: string, credential: Record<string, unknown>) => {
+    const { data } = await client.post('/v1/auth/passkeys/register/finish', {
+      ceremony_id: ceremonyId,
+      credential,
+    });
+    return data;
+  },
+
+  deletePasskey: async (id: string) => {
+    const { data } = await client.delete<{ message: string }>(`/v1/auth/passkeys/${id}`);
+    return data;
+  },
+
+  startPasskeyLogin: async (username: string, deviceName: string) => {
+    const { data } = await client.post<PasskeyAuthenticationStartResponse>(
+      '/v1/auth/passkeys/authenticate/start',
+      {
+        username,
+        device_name: deviceName,
+      },
+    );
+    return data;
+  },
+
+  finishPasskeyLogin: async (ceremonyId: string, credential: Record<string, unknown>) => {
+    const { data } = await client.post<AuthTokenPairResponse>(
+      '/v1/auth/passkeys/authenticate/finish',
+      {
+        ceremony_id: ceremonyId,
+        credential,
+      },
+    );
     return data;
   },
 

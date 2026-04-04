@@ -22,6 +22,7 @@ use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool};
 use tracing::warn;
 use uuid::Uuid;
+use webauthn_rs::prelude::*;
 
 use crate::{config::AuthConfig, state::AppState};
 
@@ -35,6 +36,7 @@ const ACCESS_TOKEN_SCOPES: [&str; 5] = [
 const REFRESH_COOKIE_NAME: &str = "mony_refresh_token";
 const CSRF_COOKIE_NAME: &str = "mony_csrf_token";
 const CSRF_HEADER_NAME: &str = "x-csrf-token";
+const WEBAUTHN_STATE_TTL_MINUTES: i64 = 10;
 
 #[derive(Clone)]
 pub struct AuthState {
@@ -47,6 +49,7 @@ pub struct AuthState {
     encoding_key: Arc<EncodingKey>,
     decoding_key: Arc<DecodingKey>,
     jwks: JwksResponse,
+    webauthn: Arc<Webauthn>,
 }
 
 impl AuthState {
@@ -72,6 +75,13 @@ impl AuthState {
             .map_err(AuthInitError::InvalidJwkKey)?;
 
         let kid = key_id(&public_key_pem);
+        let rp_origin = Url::parse(&config.webauthn_rp_origin)
+            .map_err(AuthInitError::InvalidWebauthnOrigin)?;
+        let webauthn = WebauthnBuilder::new(&config.webauthn_rp_id, &rp_origin)
+            .map_err(AuthInitError::InvalidWebauthnConfiguration)?
+            .rp_name(&config.webauthn_rp_name)
+            .build()
+            .map_err(AuthInitError::InvalidWebauthnConfiguration)?;
         let jwks = JwksResponse {
             keys: vec![JwkKey {
                 kty: "RSA".to_string(),
@@ -93,6 +103,7 @@ impl AuthState {
             encoding_key: Arc::new(encoding_key),
             decoding_key: Arc::new(decoding_key),
             jwks,
+            webauthn: Arc::new(webauthn),
         })
     }
 
@@ -105,6 +116,10 @@ impl AuthState {
 
     pub fn jwks(&self) -> &JwksResponse {
         &self.jwks
+    }
+
+    pub fn webauthn(&self) -> &Webauthn {
+        &self.webauthn
     }
 
     pub fn issue_access_token(
@@ -180,6 +195,10 @@ pub enum AuthInitError {
     InvalidPemUtf8(std::string::FromUtf8Error),
     #[error("failed to build jwks from public key: {0}")]
     InvalidJwkKey(rsa::pkcs8::spki::Error),
+    #[error("invalid webauthn rp origin: {0}")]
+    InvalidWebauthnOrigin(url::ParseError),
+    #[error("invalid webauthn configuration: {0}")]
+    InvalidWebauthnConfiguration(WebauthnError),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -283,6 +302,29 @@ pub struct ChangePasswordRequest {
     pub new_password: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PasskeyRegistrationStartRequest {
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PasskeyRegistrationFinishRequest {
+    pub ceremony_id: String,
+    pub credential: RegisterPublicKeyCredential,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PasskeyAuthenticationStartRequest {
+    pub username: String,
+    pub device_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PasskeyAuthenticationFinishRequest {
+    pub ceremony_id: String,
+    pub credential: PublicKeyCredential,
+}
+
 #[derive(Debug, Serialize)]
 pub struct AuthUserResponse {
     pub id: String,
@@ -356,6 +398,31 @@ pub struct AuthEventListResponse {
 }
 
 #[derive(Debug, Serialize)]
+pub struct PasskeyResponse {
+    pub id: String,
+    pub label: String,
+    pub created_at: DateTime<Utc>,
+    pub last_used_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PasskeyListResponse {
+    pub items: Vec<PasskeyResponse>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PasskeyRegistrationStartResponse {
+    pub ceremony_id: String,
+    pub options: CreationChallengeResponse,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PasskeyAuthenticationStartResponse {
+    pub ceremony_id: String,
+    pub options: RequestChallengeResponse,
+}
+
+#[derive(Debug, Serialize)]
 pub struct PublicBootstrapStatus {
     pub refresh_cookie_name: &'static str,
     pub csrf_cookie_name: &'static str,
@@ -419,6 +486,34 @@ struct AuthEventRecord {
     ip_address: Option<String>,
     metadata: serde_json::Value,
     created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+struct PasskeyRecord {
+    id: Uuid,
+    user_id: Uuid,
+    label: String,
+    credential_id: String,
+    credential: serde_json::Value,
+    created_at: DateTime<Utc>,
+    last_used_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, FromRow)]
+struct RegistrationCeremonyRecord {
+    id: Uuid,
+    label: String,
+    state: serde_json::Value,
+    expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+struct AuthenticationCeremonyRecord {
+    id: Uuid,
+    user_id: Uuid,
+    device_name: Option<String>,
+    state: serde_json::Value,
+    expires_at: DateTime<Utc>,
 }
 
 pub async fn require_auth(
@@ -831,6 +926,423 @@ pub async fn list_auth_events(
     }))
 }
 
+pub async fn list_passkeys(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+) -> Result<Json<PasskeyListResponse>, AuthError> {
+    let passkeys = sqlx::query_as::<_, PasskeyRecord>(
+        r#"
+        SELECT id, user_id, label, credential_id, credential, created_at, last_used_at
+        FROM auth_passkey
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        "#,
+    )
+    .bind(auth.user_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    Ok(Json(PasskeyListResponse {
+        items: passkeys.into_iter().map(PasskeyResponse::from).collect(),
+    }))
+}
+
+pub async fn start_passkey_registration(
+    State(state): State<AppState>,
+    auth: AuthenticatedUser,
+    Json(payload): Json<PasskeyRegistrationStartRequest>,
+) -> Result<Json<PasskeyRegistrationStartResponse>, AuthError> {
+    let label = sanitize_passkey_label(payload.label)?;
+    let mut tx = state
+        .db
+        .begin()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    cleanup_expired_webauthn_state(&mut tx).await?;
+    sqlx::query("DELETE FROM auth_webauthn_registration WHERE user_id = $1")
+        .bind(auth.user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    let user = find_user_by_id(&mut tx, auth.user_id).await?;
+    let existing = list_passkey_records_by_user(&mut tx, auth.user_id).await?;
+    let exclude_credentials = existing
+        .iter()
+        .map(|record| record.passkey())
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .map(|passkey| passkey.cred_id().clone())
+        .collect::<Vec<_>>();
+    let exclude_credentials = (!exclude_credentials.is_empty()).then_some(exclude_credentials);
+
+    let (options, ceremony_state) = state
+        .auth
+        .webauthn()
+        .start_passkey_registration(auth.user_id, &user.username, &user.username, exclude_credentials)
+        .map_err(map_webauthn_error)?;
+
+    let ceremony_id = Uuid::now_v7();
+    let expires_at = Utc::now() + Duration::minutes(WEBAUTHN_STATE_TTL_MINUTES);
+    sqlx::query(
+        r#"
+        INSERT INTO auth_webauthn_registration (id, user_id, label, state, expires_at)
+        VALUES ($1, $2, $3, $4, $5)
+        "#,
+    )
+    .bind(ceremony_id)
+    .bind(auth.user_id)
+    .bind(&label)
+    .bind(serde_json::to_value(&ceremony_state).map_err(|error| AuthError::Internal(error.to_string()))?)
+    .bind(expires_at)
+    .execute(&mut *tx)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    Ok(Json(PasskeyRegistrationStartResponse {
+        ceremony_id: ceremony_id.to_string(),
+        options,
+    }))
+}
+
+pub async fn finish_passkey_registration(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    auth: AuthenticatedUser,
+    Json(payload): Json<PasskeyRegistrationFinishRequest>,
+) -> Result<Json<PasskeyResponse>, AuthError> {
+    let ceremony_id = parse_uuid(&payload.ceremony_id, "invalid ceremony id")?;
+    let mut tx = state
+        .db
+        .begin()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    let record = sqlx::query_as::<_, RegistrationCeremonyRecord>(
+        r#"
+        SELECT id, label, state, expires_at
+        FROM auth_webauthn_registration
+        WHERE id = $1 AND user_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(ceremony_id)
+    .bind(auth.user_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))?
+    .ok_or_else(|| AuthError::BadRequest("registration ceremony not found".to_string()))?;
+
+    sqlx::query("DELETE FROM auth_webauthn_registration WHERE id = $1")
+        .bind(record.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    if record.expires_at <= Utc::now() {
+        return Err(AuthError::BadRequest(
+            "registration ceremony expired; try again".to_string(),
+        ));
+    }
+
+    let ceremony_state: PasskeyRegistration = serde_json::from_value(record.state)
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+    let passkey = state
+        .auth
+        .webauthn()
+        .finish_passkey_registration(&payload.credential, &ceremony_state)
+        .map_err(map_webauthn_error)?;
+    let credential_id = credential_id_string(passkey.cred_id());
+    let passkey_id = Uuid::now_v7();
+
+    sqlx::query(
+        r#"
+        INSERT INTO auth_passkey (id, user_id, label, credential_id, credential, last_used_at, last_used_session_id)
+        VALUES ($1, $2, $3, $4, $5, NULL, NULL)
+        "#,
+    )
+    .bind(passkey_id)
+    .bind(auth.user_id)
+    .bind(&record.label)
+    .bind(&credential_id)
+    .bind(serde_json::to_value(&passkey).map_err(|error| AuthError::Internal(error.to_string()))?)
+    .execute(&mut *tx)
+    .await
+    .map_err(|error| {
+        if let Some(db_error) = error.as_database_error() {
+            if db_error.is_unique_violation() {
+                return AuthError::Conflict("passkey is already registered".to_string());
+            }
+        }
+        AuthError::Internal(error.to_string())
+    })?;
+
+    log_auth_event(
+        &mut tx,
+        Some(auth.user_id),
+        Some(auth.session_id),
+        "passkey_registered",
+        request_ip_address(&headers).as_deref(),
+        json!({ "label": record.label, "credential_id": credential_id }),
+    )
+    .await?;
+
+    tx.commit()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    Ok(Json(PasskeyResponse {
+        id: passkey_id.to_string(),
+        label: record.label,
+        created_at: Utc::now(),
+        last_used_at: None,
+    }))
+}
+
+pub async fn start_passkey_authentication(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<PasskeyAuthenticationStartRequest>,
+) -> Result<Json<PasskeyAuthenticationStartResponse>, AuthError> {
+    let username = normalize_username(&payload.username)?;
+    let user = match find_user_by_username(&state.db, &username).await? {
+        Some(user) => user,
+        None => {
+            log_auth_failure(&state.db, &headers, "passkey_login_failed", &username, None).await?;
+            return Err(AuthError::Unauthorized("invalid credentials".to_string()));
+        }
+    };
+
+    let context = request_context(&headers, payload.device_name);
+    let mut tx = state
+        .db
+        .begin()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    cleanup_expired_webauthn_state(&mut tx).await?;
+    sqlx::query("DELETE FROM auth_webauthn_authentication WHERE user_id = $1")
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    let passkeys = list_passkey_records_by_user(&mut tx, user.id).await?;
+    let credentials = passkeys
+        .iter()
+        .map(|record| record.passkey())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if credentials.is_empty() {
+        tx.rollback()
+            .await
+            .map_err(|error| AuthError::Internal(error.to_string()))?;
+        log_auth_failure(
+            &state.db,
+            &headers,
+            "passkey_login_failed",
+            &username,
+            Some(user.id),
+        )
+        .await?;
+        return Err(AuthError::Unauthorized("invalid credentials".to_string()));
+    }
+
+    let (options, ceremony_state) = state
+        .auth
+        .webauthn()
+        .start_passkey_authentication(&credentials)
+        .map_err(map_webauthn_error)?;
+
+    let ceremony_id = Uuid::now_v7();
+    let expires_at = Utc::now() + Duration::minutes(WEBAUTHN_STATE_TTL_MINUTES);
+    sqlx::query(
+        r#"
+        INSERT INTO auth_webauthn_authentication (id, user_id, device_name, state, expires_at)
+        VALUES ($1, $2, $3, $4, $5)
+        "#,
+    )
+    .bind(ceremony_id)
+    .bind(user.id)
+    .bind(&context.device_name)
+    .bind(serde_json::to_value(&ceremony_state).map_err(|error| AuthError::Internal(error.to_string()))?)
+    .bind(expires_at)
+    .execute(&mut *tx)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    tx.commit()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    Ok(Json(PasskeyAuthenticationStartResponse {
+        ceremony_id: ceremony_id.to_string(),
+        options,
+    }))
+}
+
+pub async fn finish_passkey_authentication(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<PasskeyAuthenticationFinishRequest>,
+) -> Result<(HeaderMap, Json<AuthTokenPairResponse>), AuthError> {
+    let ceremony_id = parse_uuid(&payload.ceremony_id, "invalid ceremony id")?;
+    let mut tx = state
+        .db
+        .begin()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    let record = sqlx::query_as::<_, AuthenticationCeremonyRecord>(
+        r#"
+        SELECT id, user_id, device_name, state, expires_at
+        FROM auth_webauthn_authentication
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(ceremony_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))?
+    .ok_or_else(|| AuthError::BadRequest("authentication ceremony not found".to_string()))?;
+
+    sqlx::query("DELETE FROM auth_webauthn_authentication WHERE id = $1")
+        .bind(record.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    if record.expires_at <= Utc::now() {
+        return Err(AuthError::Unauthorized(
+            "authentication ceremony expired; try again".to_string(),
+        ));
+    }
+
+    let ceremony_state: PasskeyAuthentication = serde_json::from_value(record.state)
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+    let auth_result = state
+        .auth
+        .webauthn()
+        .finish_passkey_authentication(&payload.credential, &ceremony_state)
+        .map_err(|_| AuthError::Unauthorized("invalid credentials".to_string()))?;
+
+    let mut passkeys = list_passkey_records_by_user(&mut tx, record.user_id).await?;
+    if passkeys.is_empty() {
+        return Err(AuthError::Unauthorized("invalid credentials".to_string()));
+    }
+
+    let matched_credential_id = credential_id_string(auth_result.cred_id());
+    for record in &mut passkeys {
+        let mut passkey = record.passkey()?;
+        if passkey.update_credential(&auth_result).is_some() {
+            sqlx::query(
+                "UPDATE auth_passkey SET credential = $1 WHERE id = $2",
+            )
+            .bind(serde_json::to_value(&passkey).map_err(|error| AuthError::Internal(error.to_string()))?)
+            .bind(record.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|error| AuthError::Internal(error.to_string()))?;
+        }
+    }
+
+    let user = find_user_by_id(&mut tx, record.user_id).await?;
+    let context = request_context(&headers, record.device_name);
+    let session = create_session(&mut tx, &user, &context).await?;
+    sqlx::query(
+        r#"
+        UPDATE auth_passkey
+        SET last_used_at = NOW(), last_used_session_id = $2
+        WHERE user_id = $1 AND credential_id = $3
+        "#,
+    )
+    .bind(record.user_id)
+    .bind(session.id)
+    .bind(&matched_credential_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))?;
+    log_auth_event(
+        &mut tx,
+        Some(user.id),
+        Some(session.id),
+        "passkey_login",
+        context.ip_address.as_deref(),
+        json!({
+            "credential_id": matched_credential_id,
+            "device_name": context.device_name,
+            "user_verified": auth_result.user_verified()
+        }),
+    )
+    .await?;
+
+    let response = issue_token_pair(&state.auth, &mut tx, &user, &session).await?;
+    tx.commit()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    Ok(response)
+}
+
+pub async fn delete_passkey(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    auth: AuthenticatedUser,
+    Path(passkey_id): Path<Uuid>,
+) -> Result<Json<LogoutResponse>, AuthError> {
+    let mut tx = state
+        .db
+        .begin()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    let record = sqlx::query_as::<_, PasskeyRecord>(
+        r#"
+        SELECT id, user_id, label, credential_id, credential, created_at, last_used_at
+        FROM auth_passkey
+        WHERE id = $1 AND user_id = $2
+        FOR UPDATE
+        "#,
+    )
+    .bind(passkey_id)
+    .bind(auth.user_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))?
+    .ok_or_else(|| AuthError::BadRequest("passkey not found".to_string()))?;
+
+    sqlx::query("DELETE FROM auth_passkey WHERE id = $1")
+        .bind(record.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    log_auth_event(
+        &mut tx,
+        Some(auth.user_id),
+        Some(auth.session_id),
+        "passkey_deleted",
+        request_ip_address(&headers).as_deref(),
+        json!({ "label": record.label, "credential_id": record.credential_id }),
+    )
+    .await?;
+
+    tx.commit()
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+    Ok(Json(LogoutResponse {
+        message: "passkey deleted",
+    }))
+}
+
 pub async fn revoke_session_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -879,6 +1391,27 @@ impl From<SessionRecord> for AuthSessionResponse {
     }
 }
 
+impl From<PasskeyRecord> for PasskeyResponse {
+    fn from(value: PasskeyRecord) -> Self {
+        let _ = value.user_id;
+        let _ = value.credential_id;
+        let _ = value.credential;
+        Self {
+            id: value.id.to_string(),
+            label: value.label,
+            created_at: value.created_at,
+            last_used_at: value.last_used_at,
+        }
+    }
+}
+
+impl PasskeyRecord {
+    fn passkey(&self) -> Result<Passkey, AuthError> {
+        serde_json::from_value(self.credential.clone())
+            .map_err(|error| AuthError::Internal(error.to_string()))
+    }
+}
+
 async fn find_user_by_username(
     pool: &PgPool,
     username: &str,
@@ -888,6 +1421,24 @@ async fn find_user_by_username(
     )
     .bind(username)
     .fetch_optional(pool)
+    .await
+    .map_err(|error| AuthError::Internal(error.to_string()))
+}
+
+async fn list_passkey_records_by_user(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: Uuid,
+) -> Result<Vec<PasskeyRecord>, AuthError> {
+    sqlx::query_as::<_, PasskeyRecord>(
+        r#"
+        SELECT id, user_id, label, credential_id, credential, created_at, last_used_at
+        FROM auth_passkey
+        WHERE user_id = $1
+        ORDER BY created_at ASC
+        "#,
+    )
+    .bind(user_id)
+    .fetch_all(&mut **tx)
     .await
     .map_err(|error| AuthError::Internal(error.to_string()))
 }
@@ -1263,6 +1814,45 @@ fn key_id(public_key_pem: &[u8]) -> String {
     hex::encode(hasher.finalize())[..16].to_owned()
 }
 
+async fn cleanup_expired_webauthn_state(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+) -> Result<(), AuthError> {
+    sqlx::query("DELETE FROM auth_webauthn_registration WHERE expires_at <= NOW()")
+        .execute(&mut **tx)
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+    sqlx::query("DELETE FROM auth_webauthn_authentication WHERE expires_at <= NOW()")
+        .execute(&mut **tx)
+        .await
+        .map_err(|error| AuthError::Internal(error.to_string()))?;
+    Ok(())
+}
+
+fn parse_uuid(input: &str, message: &str) -> Result<Uuid, AuthError> {
+    Uuid::parse_str(input).map_err(|_| AuthError::BadRequest(message.to_string()))
+}
+
+fn sanitize_passkey_label(input: Option<String>) -> Result<String, AuthError> {
+    let label = sanitize_optional_text(input, 80)
+        .ok_or_else(|| AuthError::BadRequest("passkey label is required".to_string()))?;
+
+    if label.chars().count() < 2 {
+        return Err(AuthError::BadRequest(
+            "passkey label must be at least 2 characters long".to_string(),
+        ));
+    }
+
+    Ok(label)
+}
+
+fn credential_id_string(credential_id: &CredentialID) -> String {
+    URL_SAFE_NO_PAD.encode(credential_id)
+}
+
+fn map_webauthn_error(error: WebauthnError) -> AuthError {
+    AuthError::BadRequest(format!("passkey ceremony failed: {error}"))
+}
+
 fn request_context(headers: &HeaderMap, device_name: Option<String>) -> RequestContext {
     RequestContext {
         device_name: sanitize_optional_text(device_name, 120),
@@ -1454,6 +2044,9 @@ pub(crate) mod test_support {
             access_token_ttl_seconds: 300,
             refresh_token_ttl_days: 30,
             secure_cookies: false,
+            webauthn_rp_id: "localhost".to_string(),
+            webauthn_rp_origin: "http://localhost:5173".to_string(),
+            webauthn_rp_name: "mony".to_string(),
         })
         .expect("auth state should initialize")
     }

@@ -17,6 +17,8 @@ use crate::{
     auth::{
         bootstrap, bootstrap_status, change_password, jwks, list_auth_events, list_sessions, login,
         logout, logout_all, refresh, require_auth, revoke_session_handler, session,
+        delete_passkey, finish_passkey_authentication, finish_passkey_registration, list_passkeys,
+        start_passkey_authentication, start_passkey_registration,
     },
     categories::{list_categories, Category},
     imports::{
@@ -70,6 +72,16 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/auth/change-password", post(change_password))
         .route("/v1/auth/sessions", get(list_sessions))
         .route("/v1/auth/events", get(list_auth_events))
+        .route("/v1/auth/passkeys", get(list_passkeys))
+        .route(
+            "/v1/auth/passkeys/register/start",
+            post(start_passkey_registration),
+        )
+        .route(
+            "/v1/auth/passkeys/register/finish",
+            post(finish_passkey_registration),
+        )
+        .route("/v1/auth/passkeys/{id}", delete(delete_passkey))
         .route("/v1/auth/sessions/{id}", delete(revoke_session_handler))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
@@ -77,6 +89,14 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/auth/bootstrap/status", get(bootstrap_status))
         .route("/v1/auth/bootstrap", post(bootstrap))
         .route("/v1/auth/login", post(login))
+        .route(
+            "/v1/auth/passkeys/authenticate/start",
+            post(start_passkey_authentication),
+        )
+        .route(
+            "/v1/auth/passkeys/authenticate/finish",
+            post(finish_passkey_authentication),
+        )
         .route("/v1/auth/refresh", post(refresh))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),

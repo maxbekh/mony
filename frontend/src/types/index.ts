@@ -170,3 +170,24 @@ export interface AuthEvent {
 export interface AuthEventListResponse {
   items: AuthEvent[];
 }
+
+export interface Passkey {
+  id: string;
+  label: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface PasskeyListResponse {
+  items: Passkey[];
+}
+
+export interface PasskeyRegistrationStartResponse {
+  ceremony_id: string;
+  options: Record<string, unknown>;
+}
+
+export interface PasskeyAuthenticationStartResponse {
+  ceremony_id: string;
+  options: Record<string, unknown>;
+}
