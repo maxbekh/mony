@@ -55,23 +55,42 @@ export default function Settings() {
     let cancelled = false;
 
     const loadSecurityData = async () => {
+      // 1. Load Events
       try {
-        const [eventsResponse, passkeysResponse, aiSettingsResponse] = await Promise.all([
-          api.listAuthEvents(),
-          api.listPasskeys(),
-          api.getAiSettings(),
-        ]);
+        const eventsResponse = await api.listAuthEvents();
         if (!cancelled) {
           setEvents(eventsResponse.items);
-          setPasskeys(passkeysResponse.items);
-          setAiSettings(aiSettingsResponse);
           setEventsError(null);
-          setPasskeysError(null);
         }
       } catch {
         if (!cancelled) {
           setEventsError('Unable to load recent security activity.');
+        }
+      }
+
+      // 2. Load Passkeys
+      try {
+        const passkeysResponse = await api.listPasskeys();
+        if (!cancelled) {
+          setPasskeys(passkeysResponse.items);
+          setPasskeysError(null);
+        }
+      } catch {
+        if (!cancelled) {
           setPasskeysError('Unable to load saved passkeys.');
+        }
+      }
+
+      // 3. Load AI Settings
+      try {
+        const aiSettingsResponse = await api.getAiSettings();
+        if (!cancelled) {
+          setAiSettings(aiSettingsResponse);
+        }
+      } catch {
+        // AI settings error is handled by showing empty/default state or specific notice
+        if (!cancelled) {
+          setAiError('Unable to load AI preferences.');
         }
       }
     };

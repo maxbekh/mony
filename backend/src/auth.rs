@@ -1529,7 +1529,7 @@ async fn find_user_by_username(
     username: &str,
 ) -> Result<Option<UserRecord>, AuthError> {
     sqlx::query_as::<_, UserRecord>(
-        "SELECT id, username, password_hash FROM auth_user WHERE username = $1",
+        "SELECT id, username, password_hash, ai_settings FROM auth_user WHERE username = $1",
     )
     .bind(username)
     .fetch_optional(pool)
@@ -1567,7 +1567,7 @@ async fn find_user_by_id(
     user_id: Uuid,
 ) -> Result<UserRecord, AuthError> {
     sqlx::query_as::<_, UserRecord>(
-        "SELECT id, username, password_hash FROM auth_user WHERE id = $1",
+        "SELECT id, username, password_hash, ai_settings FROM auth_user WHERE id = $1",
     )
     .bind(user_id)
     .fetch_one(&mut **tx)
@@ -1870,7 +1870,7 @@ pub async fn admin_reset_password(
         .await
         .map_err(|error| AuthError::Internal(error.to_string()))?;
     let user = sqlx::query_as::<_, UserRecord>(
-        "SELECT id, username, password_hash FROM auth_user WHERE username = $1",
+        "SELECT id, username, password_hash, ai_settings FROM auth_user WHERE username = $1",
     )
     .bind(&username)
     .fetch_optional(&mut *tx)
