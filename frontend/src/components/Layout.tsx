@@ -1,12 +1,12 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
+  Bot,
   KeyRound,
   LayoutDashboard,
   Menu,
   PieChart,
   Receipt,
-  Tags,
   Upload,
   X,
 } from 'lucide-react';
@@ -27,7 +27,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Transactions', path: '/transactions', icon: Receipt },
-    { name: 'Categorize', path: '/categorize', icon: Tags },
+    { name: 'Assistant', path: '/categorize', icon: Bot },
     { name: 'Import', path: '/import', icon: Upload },
     { name: 'Analytics', path: '/analytics', icon: PieChart },
     { name: 'Settings', path: '/settings', icon: KeyRound },
