@@ -14,7 +14,7 @@ export interface AuthContextValue {
   session: AuthSession | null;
   scopes: string[];
   login: (username: string, password: string) => Promise<void>;
-  loginWithPasskey: (username?: string, isConditional?: boolean) => Promise<void>;
+  loginWithPasskey: (username?: string, isConditional?: boolean, preflight?: { options: any, ceremonyId: string }) => Promise<void>;
   bootstrap: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -123,13 +123,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const loginWithPasskey = React.useCallback(
-    async (username?: string, isConditional?: boolean) => {
-      const response = await api.startPasskeyLogin(username, DEVICE_NAME);
+    async (username?: string, isConditional?: boolean, preflight?: { options: any, ceremonyId: string }) => {
+      let options = preflight?.options;
+      let ceremony_id = preflight?.ceremonyId;
+
+      if (!options || !ceremony_id) {
+        const response = await api.startPasskeyLogin(username, DEVICE_NAME);
+        options = response.options;
+        ceremony_id = response.ceremony_id;
+      }
+
       const credential = await authenticateWithPasskey({
-        ...response.options,
+        ...options,
         mediation: isConditional ? 'conditional' : 'optional',
       } as any);
-      const completed = await api.finishPasskeyLogin(response.ceremony_id, credential);
+      const completed = await api.finishPasskeyLogin(ceremony_id!, credential);
       applyAuthResponse(completed);
     },
     [applyAuthResponse],

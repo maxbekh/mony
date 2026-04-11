@@ -1,6 +1,7 @@
 import React from 'react';
 import axios from 'axios';
 import { Navigate } from 'react-router-dom';
+import { api } from '../services/api';
 import { useAuth } from '../auth/useAuth';
 import { passkeysSupported } from '../auth/passkeys';
 
@@ -58,6 +59,7 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isPasskeySubmitting, setIsPasskeySubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [preflight, setPreflight] = React.useState<{ options: any, ceremonyId: string } | null>(null);
   const canUsePasskeys = !bootstrapRequired && passkeysSupported();
 
   React.useEffect(() => {
@@ -67,6 +69,16 @@ export default function Login() {
       });
     }
   }, [canUsePasskeys, loginWithPasskey]);
+
+  const fetchPreflight = async (name: string) => {
+    if (!name || bootstrapRequired) return;
+    try {
+      const response = await api.startPasskeyLogin(name, 'mony web');
+      setPreflight({ options: response.options, ceremonyId: response.ceremony_id });
+    } catch {
+      // Ignore preflight errors
+    }
+  };
 
   if (status === 'authenticated') {
     return <Navigate to="/" replace />;
@@ -95,7 +107,7 @@ export default function Login() {
     setErrorMessage(null);
 
     try {
-      await loginWithPasskey(username.trim() || undefined);
+      await loginWithPasskey(username.trim() || undefined, false, preflight ?? undefined);
     } catch (error) {
       setErrorMessage(formatError(error));
     } finally {
@@ -121,6 +133,7 @@ export default function Login() {
               type="text"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
+              onBlur={() => void fetchPreflight(username)}
               placeholder={bootstrapRequired ? 'owner' : 'Enter your username'}
               required={!isPasskeySubmitting}
             />

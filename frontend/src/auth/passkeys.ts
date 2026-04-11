@@ -69,8 +69,8 @@ export async function createPasskey(options: Record<string, unknown>) {
 
   const authenticatorSelection = {
     ...((publicKey.authenticatorSelection as Record<string, unknown> | undefined) ?? {}),
-    residentKey: 'preferred' as ResidentKeyRequirement,
-    requireResidentKey: false,
+    residentKey: 'required' as ResidentKeyRequirement,
+    requireResidentKey: true,
   };
   const creationOptions: PublicKeyCredentialCreationOptions = {
     ...(publicKey as Omit<
