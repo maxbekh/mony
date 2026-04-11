@@ -18,7 +18,7 @@ use crate::{
         bootstrap, bootstrap_status, change_password, jwks, list_auth_events, list_sessions, login,
         logout, logout_all, refresh, require_auth, revoke_session_handler, session,
         delete_passkey, finish_passkey_authentication, finish_passkey_registration, list_passkeys,
-        start_passkey_authentication, start_passkey_registration,
+        start_passkey_authentication, start_passkey_registration, AuthenticatedUser,
     },
     categories::{list_categories, Category},
     imports::{
@@ -26,6 +26,7 @@ use crate::{
         ImportManagementError,
     },
     ingestion::ingest_csv,
+    providers::{SuggestionRequest, SuggestionResponse},
     security::rate_limit_auth,
     state::AppState,
     transactions::{
@@ -66,6 +67,7 @@ pub fn build_router(state: AppState) -> Router {
             get(get_analytics_monthly_spending),
         )
         .route("/v1/categories", get(get_categories))
+        .route("/v1/assistant/suggest-category", post(post_suggest_category))
         .route("/v1/auth/session", get(session))
         .route("/v1/auth/logout", post(logout))
         .route("/v1/auth/logout/all", post(logout_all))
@@ -73,6 +75,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/auth/sessions", get(list_sessions))
         .route("/v1/auth/events", get(list_auth_events))
         .route("/v1/auth/passkeys", get(list_passkeys))
+        .route("/v1/user/ai-settings", get(get_user_ai_settings).put(put_user_ai_settings))
         .route(
             "/v1/auth/passkeys/register/start",
             post(start_passkey_registration),
@@ -332,6 +335,60 @@ fn map_transaction_update_error(error: TransactionUpdateError) -> (StatusCode, S
     }
 }
 
+async fn post_suggest_category(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Json(request): Json<SuggestionRequest>,
+) -> Result<Json<SuggestionResponse>, (StatusCode, String)> {
+    let ai_settings = get_ai_settings_from_db(&state.db, user.user_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let provider = state
+        .get_ai_provider_for_user(ai_settings)
+        .ok_or((StatusCode::NOT_IMPLEMENTED, "AI provider not configured".to_string()))?;
+
+    let suggestion = provider
+        .suggest_category(request)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(suggestion))
+}
+
+async fn get_user_ai_settings(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let settings = get_ai_settings_from_db(&state.db, user.user_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(settings))
+}
+
+async fn put_user_ai_settings(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Json(settings): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    sqlx::query("UPDATE auth_user SET ai_settings = $1 WHERE id = $2")
+        .bind(&settings)
+        .bind(user.user_id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(settings))
+}
+
+async fn get_ai_settings_from_db(pool: &PgPool, user_id: uuid::Uuid) -> Result<serde_json::Value, sqlx::Error> {
+    let settings: (serde_json::Value,) = sqlx::query_as("SELECT ai_settings FROM auth_user WHERE id = $1")
+        .bind(user_id)
+        .fetch_one(pool)
+        .await?;
+    Ok(settings.0)
+}
+
 async fn health() -> (StatusCode, Json<StatusPayload>) {
     (
         StatusCode::OK,
@@ -389,6 +446,7 @@ mod tests {
             db: pool,
             auth: test_support::auth_state(),
             rate_limiter: RateLimiter::new(),
+            gemini_api_key: None,
         }
     }
 

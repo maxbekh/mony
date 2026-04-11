@@ -449,6 +449,7 @@ struct UserRecord {
     id: Uuid,
     username: String,
     password_hash: String,
+    ai_settings: serde_json::Value,
 }
 
 #[derive(Debug, FromRow)]
@@ -579,6 +580,7 @@ pub async fn bootstrap(
         id: user_id,
         username,
         password_hash,
+        ai_settings: json!({}),
     };
     let session = create_session(&mut tx, &user, &context).await?;
     log_auth_event(
@@ -731,6 +733,7 @@ pub async fn refresh(
         id: record.user_id,
         username: record.username,
         password_hash: String::new(),
+        ai_settings: json!({}),
     };
     let response =
         rotate_token_pair(&state.auth, &mut tx, &user, &session, record.family_id).await?;

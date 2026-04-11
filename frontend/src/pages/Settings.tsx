@@ -1,6 +1,7 @@
 import React from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { Key, Save, Sparkles } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 import { createPasskey, fallbackPasskeyLabel, passkeysSupported } from '../auth/passkeys';
 import { api } from '../services/api';
@@ -44,6 +45,11 @@ export default function Settings() {
   const [isRegisteringPasskey, setIsRegisteringPasskey] = React.useState(false);
   const [passkeyLabel, setPasskeyLabel] = React.useState(fallbackPasskeyLabel());
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [aiSettings, setAiSettings] = React.useState<Record<string, any>>({});
+  const [isSavingAi, setIsSavingAi] = React.useState(false);
+  const [aiError, setAiError] = React.useState<string | null>(null);
+  const [aiSuccess, setAiSuccess] = React.useState(false);
+
   const passkeySupport = passkeysSupported();
 
   React.useEffect(() => {
@@ -51,13 +57,15 @@ export default function Settings() {
 
     const loadSecurityData = async () => {
       try {
-        const [eventsResponse, passkeysResponse] = await Promise.all([
+        const [eventsResponse, passkeysResponse, aiSettingsResponse] = await Promise.all([
           api.listAuthEvents(),
           api.listPasskeys(),
+          api.getAiSettings(),
         ]);
         if (!cancelled) {
           setEvents(eventsResponse.items);
           setPasskeys(passkeysResponse.items);
+          setAiSettings(aiSettingsResponse);
           setEventsError(null);
           setPasskeysError(null);
         }
@@ -75,6 +83,30 @@ export default function Settings() {
       cancelled = true;
     };
   }, []);
+
+  const handleAiSettingsSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSavingAi(true);
+    setAiError(null);
+    setAiSuccess(false);
+
+    try {
+      await api.updateAiSettings(aiSettings);
+      setAiSuccess(true);
+      setTimeout(() => setAiSuccess(false), 3000);
+    } catch (error) {
+      setAiError(formatError(error));
+    } finally {
+      setIsSavingAi(false);
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    // This is a placeholder for the "CLI-style" auth.
+    // In a real implementation, this might redirect to a backend endpoint 
+    // that initiates an OAuth flow or asks the user to run a CLI command.
+    alert('Google Login is currently in "Developer Preview". To enable AI without an API key, please use the CLI to link your Google Account: \n\n mony auth login-google');
+  };
 
   const handlePasskeyRegistration = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -141,10 +173,50 @@ export default function Settings() {
       <div className="settings-header">
         <div>
           <span className="settings-eyebrow">Settings</span>
-          <h1>Change password</h1>
+          <h1>Account & Security</h1>
           <p>{user?.username}</p>
         </div>
       </div>
+
+      <section className="settings-section">
+        <div className="settings-block-header">
+          <Sparkles size={18} />
+          <div>
+            <strong>AI Assistant</strong>
+            <span>Configure your personal AI preferences and API keys.</span>
+          </div>
+        </div>
+
+        <form className="settings-card" onSubmit={handleAiSettingsSubmit}>
+          <div className="field">
+            <label htmlFor="gemini_api_key">Gemini API Key</label>
+            <div className="input-with-icon">
+              <Key size={16} />
+              <input
+                id="gemini_api_key"
+                type="password"
+                placeholder="sk-..."
+                value={aiSettings.gemini_api_key || ''}
+                onChange={(e) => setAiSettings({ ...aiSettings, gemini_api_key: e.target.value })}
+              />
+            </div>
+            <p className="field-hint">Your key is stored securely and only used for your categorization requests.</p>
+          </div>
+
+          <div className="settings-actions">
+            <button type="submit" className="button primary" disabled={isSavingAi}>
+              <Save size={16} />
+              {isSavingAi ? 'Saving...' : 'Save AI Settings'}
+            </button>
+            <button type="button" className="button secondary" onClick={handleGoogleLogin}>
+              Link Google Account (Beta)
+            </button>
+          </div>
+
+          {aiError && <div className="notice error">{aiError}</div>}
+          {aiSuccess && <div className="notice success">AI settings updated successfully!</div>}
+        </form>
+      </section>
 
       <section className="settings-form">
         <div className="settings-block-header">

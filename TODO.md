@@ -52,7 +52,7 @@ This file tracks the progress of the **mony** project.
 - [x] Intelligent categorization: derive stronger local rules from normalized descriptions, source metadata, and recurring patterns
 - [ ] Intelligent categorization: learn from confirmed historical categorizations already stored in the database
 - [ ] Intelligent categorization: add optional AI suggestions only for unresolved or low-confidence cases
-- [ ] Intelligent categorization: add a provider-backed assistant with pluggable Gemini, Claude, and Codex adapters behind one backend interface
+- [x] (CLAIMED: @gemini-cli) Intelligent categorization: add a provider-backed assistant with pluggable Gemini, Claude, and Codex adapters behind one backend interface
 - [ ] Intelligent categorization: persist assistant rules, feedback, and accepted suggestions in the database instead of browser-only storage
 - [ ] Product/UI: add a model selector and provider availability states inside the categorization assistant workspace
 - [x] Implement auth foundation: bootstrap admin, JWT access tokens, refresh token rotation, session audit, and protected web/API flows
@@ -104,8 +104,8 @@ This file tracks the progress of the **mony** project.
 - Build a local-only categorization memory layer that learns from confirmed edits without storing personal patterns in the public repository.
 - Add month-based category analytics so users can inspect trends like groceries spending over time.
 - Define the first configurable dashboard slice with a strong default layout and minimal but clear personalization.
-- Add backend AI provider adapters plus secure env-based key loading for Gemini, Claude, and Codex.
-- Persist assistant-learned categorization rules and feedback in Postgres with explicit review state and auditability.
+- [x] Add backend AI provider adapters plus secure env-based key loading for Gemini, Claude, and Codex. (CLAIMED: @gemini-cli)
+- [ ] Persist assistant-learned categorization rules and feedback in Postgres with explicit review state and auditability.
 
 ## Infrastructure & DX
 

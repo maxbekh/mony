@@ -53,6 +53,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         db: pool,
         auth,
         rate_limiter: RateLimiter::new(),
+        gemini_api_key: config.gemini_api_key,
     };
 
     info!(%address, "starting backend");

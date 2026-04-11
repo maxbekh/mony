@@ -19,6 +19,7 @@ pub struct AppConfig {
     pub port: u16,
     pub database: DatabaseConfig,
     pub auth: AuthConfig,
+    pub gemini_api_key: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,11 +124,14 @@ impl AppConfig {
                 .unwrap_or_else(|| DEFAULT_WEBAUTHN_RP_NAME.to_owned()),
         };
 
+        let gemini_api_key = lookup("GEMINI_API_KEY");
+
         Ok(Self {
             host,
             port,
             database,
             auth,
+            gemini_api_key,
         })
     }
 }
@@ -231,6 +235,7 @@ mod tests {
                     webauthn_rp_origin: "http://localhost:5173".to_owned(),
                     webauthn_rp_name: "mony".to_owned(),
                 },
+                gemini_api_key: None,
             }
         );
     }

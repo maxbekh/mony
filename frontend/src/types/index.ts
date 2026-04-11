@@ -191,3 +191,14 @@ export interface PasskeyAuthenticationStartResponse {
   ceremony_id: string;
   options: Record<string, unknown>;
 }
+
+export interface SuggestionRequest {
+  description: string;
+  existing_category?: string;
+}
+
+export interface SuggestionResponse {
+  category_key: string;
+  confidence: number;
+  reasoning: string;
+}

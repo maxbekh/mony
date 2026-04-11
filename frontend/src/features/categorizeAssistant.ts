@@ -1,11 +1,12 @@
 import type { Category, Transaction } from '../types';
+import { api } from '../services/api';
 
 export interface AssistantRule {
   id: string;
   pattern: string;
   category_key: string;
   created_at: string;
-  source: 'instruction' | 'history' | 'heuristic';
+  source: 'instruction' | 'history' | 'heuristic' | 'ai';
   confidence: number;
   note?: string;
 }
@@ -213,7 +214,7 @@ export function buildAssistantProposals(params: {
           return right.score - left.score;
         }
 
-        const sourceWeight = { instruction: 3, history: 2, heuristic: 1 };
+        const sourceWeight = { instruction: 3, history: 2, heuristic: 1, ai: 0 };
         return sourceWeight[right.rule.source] - sourceWeight[left.rule.source];
       })[0]?.rule;
 
@@ -306,4 +307,32 @@ export function createInstructionRule(params: {
     confidence: 0.96,
     note: params.note ?? 'You explicitly taught this rule to the assistant.',
   };
+}
+
+export async function getAiProposal(params: {
+  transaction: Transaction;
+  categories: Category[];
+}): Promise<AssistantProposal | null> {
+  try {
+    const { transaction, categories } = params;
+    const suggestion = await api.suggestCategory({
+      description: transaction.description,
+      existing_category: transaction.category_key ?? undefined,
+    });
+
+    return {
+      id: `ai:${suggestion.category_key}:${transaction.id}`,
+      category_key: suggestion.category_key,
+      category_label: labelForCategory(categories, suggestion.category_key),
+      source: 'ai',
+      confidence: suggestion.confidence,
+      confidence_label: confidenceLabel(suggestion.confidence),
+      reason: suggestion.reasoning,
+      matched_pattern: transaction.description,
+      transactions: [transaction],
+    };
+  } catch (error) {
+    console.error('Failed to get AI proposal:', error);
+    return null;
+  }
 }

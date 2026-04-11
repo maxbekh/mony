@@ -7,6 +7,7 @@ pub mod config;
 pub mod db;
 pub mod imports;
 pub mod ingestion;
+pub mod providers;
 pub mod security;
 pub mod state;
 pub mod transactions;

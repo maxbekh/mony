@@ -15,6 +15,8 @@ import type {
   ImportResponse,
   ImportBatchListResponse,
   DeleteImportResponse,
+  SuggestionRequest,
+  SuggestionResponse,
   AnalyticsQueryParams,
   AnalyticsResponse,
   MonthlyAnalyticsResponse,
@@ -246,6 +248,21 @@ export const api = {
 
   deleteImport: async (id: string) => {
     const { data } = await client.delete<DeleteImportResponse>(`/v1/imports/${id}`);
+    return data;
+  },
+
+  suggestCategory: async (request: SuggestionRequest) => {
+    const { data } = await client.post<SuggestionResponse>('/v1/assistant/suggest-category', request);
+    return data;
+  },
+
+  getAiSettings: async () => {
+    const { data } = await client.get<Record<string, any>>('/v1/user/ai-settings');
+    return data;
+  },
+
+  updateAiSettings: async (settings: Record<string, any>) => {
+    const { data } = await client.put<Record<string, any>>('/v1/user/ai-settings', settings);
     return data;
   },
 };

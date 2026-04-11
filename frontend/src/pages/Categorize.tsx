@@ -17,6 +17,7 @@ import {
   buildHeuristicRules,
   buildHistoryRules,
   createInstructionRule,
+  getAiProposal,
   isAssistantRejected,
   parseRuleInstruction,
   type AssistantProposal,
@@ -105,6 +106,7 @@ export default function Categorize() {
   const [queue, setQueue] = React.useState<Transaction[]>([]);
   const [history, setHistory] = React.useState<Transaction[]>([]);
   const [userRules, setUserRules] = React.useState<AssistantRule[]>(() => readStoredRules());
+  const [aiProposals, setAiProposals] = React.useState<AssistantProposal[]>([]);
   const [messages, setMessages] = React.useState<ChatMessage[]>([
     {
       id: 'intro',
@@ -118,6 +120,62 @@ export default function Categorize() {
   const [error, setError] = React.useState<string | null>(null);
   const [busyProposalId, setBusyProposalId] = React.useState<string | null>(null);
   const [selectedProposalId, setSelectedProposalId] = React.useState<string | null>(null);
+  const [aiLoading, setAiLoading] = React.useState(false);
+
+  const discoverAiSuggestions = async () => {
+    if (aiLoading || !queue.length) return;
+    
+    setAiLoading(true);
+    try {
+      // Find transactions that don't have a proposal yet
+      const transactionsWithoutProposal = queue.filter(t => 
+        !baseProposals.some(p => p.transactions.some(pt => pt.id === t.id))
+      ).slice(0, 5); // Limit to 5 for now to avoid too many requests
+
+      if (transactionsWithoutProposal.length === 0) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `ai-no-op-${Date.now()}`,
+            role: 'assistant',
+            content: "All pending transactions already have suggestions. I'll focus on those first!",
+          }
+        ]);
+        return;
+      }
+
+      const results = await Promise.all(
+        transactionsWithoutProposal.map(t => getAiProposal({ transaction: t, categories }))
+      );
+
+      const newProposals = results.filter((p): p is AssistantProposal => p !== null);
+      setAiProposals(prev => [...prev, ...newProposals]);
+
+      if (newProposals.length > 0) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `ai-results-${Date.now()}`,
+            role: 'assistant',
+            content: `I've analyzed ${newProposals.length} more transactions using AI. Review them in the side rail.`,
+          }
+        ]);
+      } else {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: `ai-fail-${Date.now()}`,
+            role: 'assistant',
+            content: "I couldn't generate new AI suggestions right now. Please try teaching me a rule instead.",
+          }
+        ]);
+      }
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to get AI suggestions.'));
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   React.useEffect(() => {
     writeStoredRules(userRules);
@@ -126,6 +184,7 @@ export default function Categorize() {
   const loadWorkspace = React.useCallback(async () => {
     setLoading(true);
     setError(null);
+    setAiProposals([]);
 
     try {
       const [categoryData, uncategorizedData, historyData] = await Promise.all([
@@ -161,7 +220,7 @@ export default function Categorize() {
 
   const historyRules = React.useMemo(() => buildHistoryRules(history), [history]);
   const heuristicRules = React.useMemo(() => buildHeuristicRules(), []);
-  const proposals = React.useMemo(
+  const baseProposals = React.useMemo(
     () =>
       buildAssistantProposals({
         queue,
@@ -172,6 +231,19 @@ export default function Categorize() {
       }),
     [categories, heuristicRules, historyRules, queue, userRules],
   );
+
+  const proposals = React.useMemo(() => {
+    const combined = [...baseProposals];
+    
+    // Add AI proposals if they don't overlap with base proposals
+    for (const aiProp of aiProposals) {
+      if (!combined.some(p => p.transactions.some(t => aiProp.transactions.some(at => at.id === t.id)))) {
+        combined.push(aiProp);
+      }
+    }
+    
+    return combined;
+  }, [baseProposals, aiProposals]);
 
   React.useEffect(() => {
     if (!proposals.length) {
@@ -453,6 +525,15 @@ export default function Categorize() {
                 <span>Review what the assistant wants to classify next.</span>
               </div>
             </div>
+            <button
+              className="assistant-ai-trigger"
+              type="button"
+              onClick={discoverAiSuggestions}
+              disabled={aiLoading || !queue.length}
+            >
+              <Sparkles size={16} />
+              {aiLoading ? 'Thinking…' : 'Ask AI'}
+            </button>
           </div>
 
           {loading ? (
@@ -827,6 +908,35 @@ export default function Categorize() {
         .assistant-confidence.heuristic {
           background: rgba(217, 119, 6, 0.14);
           color: #b45309;
+        }
+        .assistant-confidence.ai {
+          background: #fdf2f8;
+          color: #be185d;
+          background-image: linear-gradient(135deg, rgba(190, 24, 93, 0.08) 0%, transparent 100%);
+        }
+        .assistant-ai-trigger {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.45rem 0.85rem;
+          border-radius: 999px;
+          border: 1px solid rgba(190, 24, 93, 0.24);
+          background: #fdf2f8;
+          color: #be185d;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .assistant-ai-trigger:hover:not(:disabled) {
+          background: #fce7f3;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(190, 24, 93, 0.12);
+        }
+        .assistant-ai-trigger:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+          filter: grayscale(1);
         }
         .assistant-proposal-count {
           color: var(--text-muted);
