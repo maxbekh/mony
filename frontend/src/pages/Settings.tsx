@@ -1,7 +1,6 @@
 import React from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Key, Save, Sparkles } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 import { createPasskey, fallbackPasskeyLabel, passkeysSupported } from '../auth/passkeys';
 import { api } from '../services/api';
@@ -178,43 +177,40 @@ export default function Settings() {
         </div>
       </div>
 
-      <section className="settings-section">
+      <section className="settings-form">
         <div className="settings-block-header">
-          <Sparkles size={18} />
           <div>
-            <strong>AI Assistant</strong>
-            <span>Configure your personal AI preferences and API keys.</span>
+            <span className="settings-eyebrow">Intelligence</span>
+            <h2>AI Assistant</h2>
+            <p className="settings-empty">
+              Configure your personal AI preferences. These settings are private to your account.
+            </p>
           </div>
         </div>
 
-        <form className="settings-card" onSubmit={handleAiSettingsSubmit}>
-          <div className="field">
-            <label htmlFor="gemini_api_key">Gemini API Key</label>
-            <div className="input-with-icon">
-              <Key size={16} />
-              <input
-                id="gemini_api_key"
-                type="password"
-                placeholder="sk-..."
-                value={aiSettings.gemini_api_key || ''}
-                onChange={(e) => setAiSettings({ ...aiSettings, gemini_api_key: e.target.value })}
-              />
-            </div>
-            <p className="field-hint">Your key is stored securely and only used for your categorization requests.</p>
-          </div>
+        <form className="auth-form" onSubmit={handleAiSettingsSubmit}>
+          <label className="auth-field">
+            <span>Gemini API Key</span>
+            <input
+              id="gemini_api_key"
+              type="password"
+              placeholder="sk-..."
+              value={aiSettings.gemini_api_key || ''}
+              onChange={(e) => setAiSettings({ ...aiSettings, gemini_api_key: e.target.value })}
+            />
+          </label>
 
-          <div className="settings-actions">
-            <button type="submit" className="button primary" disabled={isSavingAi}>
-              <Save size={16} />
-              {isSavingAi ? 'Saving...' : 'Save AI Settings'}
+          <div className="settings-actions-row">
+            <button className="auth-secondary-submit" disabled={isSavingAi} type="submit">
+              {isSavingAi ? 'Saving…' : 'Save AI settings'}
             </button>
-            <button type="button" className="button secondary" onClick={handleGoogleLogin}>
-              Link Google Account (Beta)
+            <button className="button-secondary-inline" type="button" onClick={handleGoogleLogin}>
+              Link Google Account
             </button>
           </div>
 
-          {aiError && <div className="notice error">{aiError}</div>}
-          {aiSuccess && <div className="notice success">AI settings updated successfully!</div>}
+          {aiError && <p className="auth-error">{aiError}</p>}
+          {aiSuccess && <p className="auth-success">AI settings updated successfully!</p>}
         </form>
       </section>
 

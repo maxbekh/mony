@@ -625,6 +625,13 @@ textarea {
   box-shadow: var(--shadow-soft);
 }
 
+.settings-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
 .settings-empty {
   color: var(--text-muted);
 }
@@ -789,6 +796,12 @@ textarea {
 
 .auth-error {
   color: var(--danger-text);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.auth-success {
+  color: var(--success-text);
   font-size: 0.92rem;
   line-height: 1.4;
 }

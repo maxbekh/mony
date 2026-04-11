@@ -11,3 +11,4 @@ pub mod providers;
 pub mod security;
 pub mod state;
 pub mod transactions;
+pub mod user;

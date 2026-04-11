@@ -449,6 +449,7 @@ struct UserRecord {
     id: Uuid,
     username: String,
     password_hash: String,
+    #[allow(dead_code)]
     ai_settings: serde_json::Value,
 }
 
