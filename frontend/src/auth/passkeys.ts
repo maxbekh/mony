@@ -50,22 +50,41 @@ export function passkeyFriendlyName() {
 
 export async function createPasskey(options: Record<string, unknown>) {
   const publicKey = options.publicKey as Record<string, unknown>;
+  if (!publicKey) {
+    throw new Error('Missing publicKey in registration options');
+  }
+
   const user = publicKey.user as Record<string, unknown>;
+  if (!user) {
+    throw new Error('Missing user in registration options');
+  }
+
+  const authenticatorSelection = {
+    ...((publicKey.authenticatorSelection as Record<string, unknown> | undefined) ?? {}),
+    residentKey: 'required' as ResidentKeyRequirement,
+    requireResidentKey: true,
+  };
+  const creationOptions: PublicKeyCredentialCreationOptions = {
+    ...(publicKey as Omit<
+      PublicKeyCredentialCreationOptions,
+      'challenge' | 'user' | 'excludeCredentials'
+    >),
+    challenge: decodeBase64Url(String(publicKey.challenge)),
+    user: {
+      name: String(user.name ?? ''),
+      displayName: String(user.displayName ?? user.name ?? ''),
+      id: decodeBase64Url(String(user.id)),
+    },
+    excludeCredentials: Array.isArray(publicKey.excludeCredentials)
+      ? publicKey.excludeCredentials.map((descriptor) =>
+          mapCredentialDescriptor(descriptor as Record<string, unknown>),
+        )
+      : undefined,
+    authenticatorSelection,
+  };
+
   const credential = (await navigator.credentials.create({
-    publicKey: {
-      ...(publicKey as Omit<PublicKeyCredentialCreationOptions, 'challenge' | 'user' | 'excludeCredentials'>),
-      challenge: decodeBase64Url(String(publicKey.challenge)),
-      user: {
-        name: String(user.name ?? ''),
-        displayName: String(user.displayName ?? user.name ?? ''),
-        id: decodeBase64Url(String((publicKey.user as Record<string, unknown>).id)),
-      },
-      excludeCredentials: Array.isArray(publicKey.excludeCredentials)
-        ? publicKey.excludeCredentials.map((descriptor) =>
-            mapCredentialDescriptor(descriptor as Record<string, unknown>),
-          )
-        : undefined,
-    } as PublicKeyCredentialCreationOptions,
+    publicKey: creationOptions,
   })) as PublicKeyCredential | null;
 
   if (!credential) {
@@ -91,19 +110,25 @@ export async function createPasskey(options: Record<string, unknown>) {
 
 export async function authenticateWithPasskey(options: Record<string, unknown>) {
   const publicKey = options.publicKey as Record<string, unknown>;
+  if (!publicKey) {
+    throw new Error('Missing publicKey in authentication options');
+  }
+
+  const requestOptions: PublicKeyCredentialRequestOptions = {
+    ...(publicKey as Omit<PublicKeyCredentialRequestOptions, 'challenge' | 'allowCredentials'>),
+    challenge: decodeBase64Url(String(publicKey.challenge)),
+    allowCredentials: Array.isArray(publicKey.allowCredentials)
+      ? publicKey.allowCredentials.map((descriptor) =>
+          mapCredentialDescriptor(descriptor as Record<string, unknown>),
+        )
+      : undefined,
+    userVerification:
+      (publicKey.userVerification as UserVerificationRequirement | undefined) ?? 'required',
+  };
+
   const credential = (await navigator.credentials.get({
     mediation: (options.mediation as CredentialMediationRequirement | undefined) ?? 'optional',
-    publicKey: {
-      ...(publicKey as Omit<PublicKeyCredentialRequestOptions, 'challenge' | 'allowCredentials'>),
-      challenge: decodeBase64Url(String(publicKey.challenge)),
-      allowCredentials: Array.isArray(publicKey.allowCredentials)
-        ? publicKey.allowCredentials.map((descriptor) =>
-            mapCredentialDescriptor(descriptor as Record<string, unknown>),
-          )
-        : undefined,
-      userVerification:
-        (publicKey.userVerification as UserVerificationRequirement | undefined) ?? 'required',
-    } as PublicKeyCredentialRequestOptions,
+    publicKey: requestOptions,
   })) as PublicKeyCredential | null;
 
   if (!credential) {

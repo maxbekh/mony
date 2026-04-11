@@ -156,7 +156,7 @@ export const api = {
     return data;
   },
 
-  startPasskeyLogin: async (username: string, deviceName: string) => {
+  startPasskeyLogin: async (username: string | undefined, deviceName: string) => {
     const { data } = await client.post<PasskeyAuthenticationStartResponse>(
       '/v1/auth/passkeys/authenticate/start',
       {

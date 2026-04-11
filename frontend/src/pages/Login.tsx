@@ -4,26 +4,51 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import { passkeysSupported } from '../auth/passkeys';
 
+function normalizeApiMessage(message: string) {
+  const trimmed = message.trim();
+  if (!trimmed) {
+    return 'Sign-in failed. Please try again.';
+  }
+
+  if (
+    trimmed ===
+    "username must be 3 to 64 characters and use only letters, numbers, '.', '_', '-', or '@'"
+  ) {
+    return "Enter a valid username using 3 to 64 letters, numbers, '.', '_', '-', or '@'.";
+  }
+
+  if (trimmed === 'invalid credentials') {
+    return 'Incorrect username, password, or passkey.';
+  }
+
+  const normalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  return normalized.endsWith('.') ? normalized : `${normalized}.`;
+}
+
 function formatError(error: unknown) {
   if (axios.isAxiosError(error)) {
     if (typeof error.response?.data === 'string') {
-      const message = error.response.data.trim();
-      if (!message) {
-        return 'Unable to sign in.';
-      }
-
-      const normalized = message.charAt(0).toUpperCase() + message.slice(1);
-      return normalized.endsWith('.') ? normalized : `${normalized}.`;
+      return normalizeApiMessage(error.response.data);
     }
 
-    return 'Unable to sign in.';
+    return 'Sign-in failed. Please try again.';
+  }
+
+  if (error instanceof DOMException) {
+    if (error.name === 'SecurityError') {
+      return 'Passkey security check failed. Open the app on the configured passkey domain and try again.';
+    }
+    if (error.name === 'NotAllowedError') {
+      return 'Passkey sign-in was cancelled or not approved.';
+    }
+    return error.message.trim() || 'The browser could not complete passkey sign-in.';
   }
 
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
 
-  return 'Unable to sign in.';
+  return 'Sign-in failed. Please try again.';
 }
 
 export default function Login() {
@@ -62,7 +87,7 @@ export default function Login() {
     setErrorMessage(null);
 
     try {
-      await loginWithPasskey(username);
+      await loginWithPasskey(username.trim() || undefined);
     } catch (error) {
       setErrorMessage(formatError(error));
     } finally {
@@ -89,7 +114,7 @@ export default function Login() {
               value={username}
               onChange={(event) => setUsername(event.target.value)}
               placeholder={bootstrapRequired ? 'owner' : 'Enter your username'}
-              required
+              required={!isPasskeySubmitting}
             />
           </label>
 
@@ -108,7 +133,7 @@ export default function Login() {
               placeholder={
                 bootstrapRequired ? 'Choose a long passphrase' : 'Enter your password'
               }
-              required
+              required={!isPasskeySubmitting}
             />
             {bootstrapRequired ? (
               <p className="auth-hint">
@@ -119,7 +144,6 @@ export default function Login() {
 
           {errorMessage ? (
             <div aria-live="polite" className="auth-error-card" role="alert">
-              <strong>Unable to sign in</strong>
               <p className="auth-error">{errorMessage}</p>
             </div>
           ) : null}
@@ -135,7 +159,7 @@ export default function Login() {
               </div>
               <button
                 className="auth-secondary-submit"
-                disabled={isPasskeySubmitting || !username.trim()}
+                disabled={isPasskeySubmitting}
                 onClick={() => void handlePasskeySignIn()}
                 type="button"
               >

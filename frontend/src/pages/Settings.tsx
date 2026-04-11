@@ -15,6 +15,13 @@ function formatError(error: unknown) {
       : 'Unable to complete security action.';
   }
 
+  if (error instanceof DOMException) {
+    if (error.name === 'SecurityError' || error.name === 'NotAllowedError') {
+      return `Security error: ${error.message}. This usually happens if the domain doesn't match the passkey configuration (RP ID).`;
+    }
+    return `Browser error: ${error.message}`;
+  }
+
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
