@@ -55,6 +55,12 @@ Agents should pick tasks from this list and **update `TODO.md`** to indicate the
 - **Task 5.5**: Surface anomaly-oriented insights such as unusually high spending, category spikes, and uncategorized or low-confidence transactions.
 - **Task 5.6**: Persist per-user dashboard preferences (selected widgets, ordering, pinned categories, default period) without hard-coding one universal layout.
 
+### Phase 6: AI-Enhanced Intelligence
+- **Task 6.1**: Implement a pluggable AI provider architecture in the backend with support for Gemini, Claude, and Codex.
+- **Task 6.2**: Add a categorization assistant workspace in the frontend with model selection and real-time suggestions.
+- **Task 6.3**: Implement background "smart audit" flows that highlight potential misclassifications using AI confidence scores.
+- **Task 6.4**: Persist assistant-learned rules and feedback in the database to improve local categorization over time.
+
 ## Product Direction: Intelligent Financial Dashboard
 
 The product should help users understand their money quickly, then let them go deeper without forcing everyone into the same dashboard. The default experience should feel useful immediately, but the long-term model should be a **user-configurable dashboard** built from small analytics widgets backed by stable server-side aggregates.
@@ -98,6 +104,15 @@ Agents building dashboard or analytics features should prioritize a compact defa
 - Any "smart" labeling such as recurring payment or anomaly detection must expose a reason or confidence level.
 - User personalization should be limited to layout and preferences first; avoid building a full custom report builder too early.
 - If a widget cannot be backed by reliable data yet, omit it rather than guessing.
+
+## AI Integration & Assistant Strategy
+
+The project integrates AI-driven insights and categorization while maintaining privacy and financial integrity.
+
+- **Pluggable Providers**: The backend supports multiple AI providers via a unified internal interface. Initial focus is on **Gemini**.
+- **Secure Key Management**: Provider API keys must be loaded from environment variables (e.g., `GEMINI_API_KEY`) and never committed. This follows the same security pattern as other sensitive auth configurations.
+- **Last-Layer Intelligence**: AI is a suggestion mechanism for unresolved or low-confidence cases, not the primary source of truth.
+- **Local-First Privacy**: User data sent to AI providers must be minimized and anonymized where possible. Learned patterns are stored locally in the database.
 
 ## Task Coordination Protocol
 
