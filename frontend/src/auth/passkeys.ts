@@ -44,6 +44,14 @@ export function passkeysSupported() {
   );
 }
 
+export async function passkeyConditionalUiSupported() {
+  return (
+    passkeysSupported() &&
+    typeof window.PublicKeyCredential.isConditionalMediationAvailable === 'function' &&
+    (await window.PublicKeyCredential.isConditionalMediationAvailable())
+  );
+}
+
 export function passkeyFriendlyName() {
   return `${navigator.platform || 'Device'} · ${navigator.userAgent.includes('Mobile') ? 'mobile' : 'browser'}`;
 }
@@ -61,8 +69,8 @@ export async function createPasskey(options: Record<string, unknown>) {
 
   const authenticatorSelection = {
     ...((publicKey.authenticatorSelection as Record<string, unknown> | undefined) ?? {}),
-    residentKey: 'required' as ResidentKeyRequirement,
-    requireResidentKey: true,
+    residentKey: 'preferred' as ResidentKeyRequirement,
+    requireResidentKey: false,
   };
   const creationOptions: PublicKeyCredentialCreationOptions = {
     ...(publicKey as Omit<

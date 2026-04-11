@@ -14,7 +14,7 @@ export interface AuthContextValue {
   session: AuthSession | null;
   scopes: string[];
   login: (username: string, password: string) => Promise<void>;
-  loginWithPasskey: (username?: string) => Promise<void>;
+  loginWithPasskey: (username?: string, isConditional?: boolean) => Promise<void>;
   bootstrap: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -123,9 +123,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const loginWithPasskey = React.useCallback(
-    async (username?: string) => {
+    async (username?: string, isConditional?: boolean) => {
       const response = await api.startPasskeyLogin(username, DEVICE_NAME);
-      const credential = await authenticateWithPasskey(response.options);
+      const credential = await authenticateWithPasskey({
+        ...response.options,
+        mediation: isConditional ? 'conditional' : 'optional',
+      } as any);
       const completed = await api.finishPasskeyLogin(response.ceremony_id, credential);
       applyAuthResponse(completed);
     },

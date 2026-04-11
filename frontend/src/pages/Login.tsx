@@ -60,6 +60,14 @@ export default function Login() {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const canUsePasskeys = !bootstrapRequired && passkeysSupported();
 
+  React.useEffect(() => {
+    if (canUsePasskeys) {
+      void loginWithPasskey(undefined, true).catch(() => {
+        // Silently ignore conditional UI failures/cancellations
+      });
+    }
+  }, [canUsePasskeys, loginWithPasskey]);
+
   if (status === 'authenticated') {
     return <Navigate to="/" replace />;
   }
@@ -107,7 +115,7 @@ export default function Login() {
           <label className="auth-field">
             <span>Username</span>
             <input
-              autoComplete="username"
+              autoComplete="username webauthn"
               name="username"
               spellCheck={false}
               type="text"
