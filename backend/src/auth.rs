@@ -315,7 +315,7 @@ pub struct PasskeyRegistrationFinishRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct PasskeyAuthenticationStartRequest {
-    pub username: String,
+    pub username: Option<String>,
     pub device_name: Option<String>,
 }
 
@@ -510,7 +510,7 @@ struct RegistrationCeremonyRecord {
 #[derive(Debug, FromRow)]
 struct AuthenticationCeremonyRecord {
     id: Uuid,
-    user_id: Uuid,
+    user_id: Option<Uuid>,
     device_name: Option<String>,
     state: serde_json::Value,
     expires_at: DateTime<Utc>,
@@ -954,6 +954,7 @@ pub async fn start_passkey_registration(
     Json(payload): Json<PasskeyRegistrationStartRequest>,
 ) -> Result<Json<PasskeyRegistrationStartResponse>, AuthError> {
     let label = sanitize_passkey_label(payload.label)?;
+    tracing::debug!(?auth.user_id, ?label, "starting passkey registration");
     let mut tx = state
         .db
         .begin()
@@ -978,11 +979,18 @@ pub async fn start_passkey_registration(
         .collect::<Vec<_>>();
     let exclude_credentials = (!exclude_credentials.is_empty()).then_some(exclude_credentials);
 
+    tracing::debug!(?exclude_credentials, "webauthn exclude_credentials");
+
     let (options, ceremony_state) = state
         .auth
         .webauthn()
         .start_passkey_registration(auth.user_id, &user.username, &user.username, exclude_credentials)
-        .map_err(map_webauthn_error)?;
+        .map_err(|error| {
+            tracing::error!(?error, "webauthn start_passkey_registration failed");
+            map_webauthn_error(error)
+        })?;
+
+    tracing::debug!(?options, "webauthn creation options generated");
 
     let ceremony_id = Uuid::now_v7();
     let expires_at = Utc::now() + Duration::minutes(WEBAUTHN_STATE_TTL_MINUTES);
@@ -1018,6 +1026,7 @@ pub async fn finish_passkey_registration(
     Json(payload): Json<PasskeyRegistrationFinishRequest>,
 ) -> Result<Json<PasskeyResponse>, AuthError> {
     let ceremony_id = parse_uuid(&payload.ceremony_id, "invalid ceremony id")?;
+    tracing::debug!(?ceremony_id, "finishing passkey registration");
     let mut tx = state
         .db
         .begin()
@@ -1053,11 +1062,15 @@ pub async fn finish_passkey_registration(
 
     let ceremony_state: PasskeyRegistration = serde_json::from_value(record.state)
         .map_err(|error| AuthError::Internal(error.to_string()))?;
+
     let passkey = state
         .auth
         .webauthn()
         .finish_passkey_registration(&payload.credential, &ceremony_state)
-        .map_err(map_webauthn_error)?;
+        .map_err(|error| {
+            tracing::error!(?error, "finish_passkey_registration webauthn validation failed");
+            map_webauthn_error(error)
+        })?;
     let credential_id = credential_id_string(passkey.cred_id());
     let passkey_id = Uuid::now_v7();
 
@@ -1110,13 +1123,60 @@ pub async fn start_passkey_authentication(
     headers: HeaderMap,
     Json(payload): Json<PasskeyAuthenticationStartRequest>,
 ) -> Result<Json<PasskeyAuthenticationStartResponse>, AuthError> {
-    let username = normalize_username(&payload.username)?;
-    let user = match find_user_by_username(&state.db, &username).await? {
-        Some(user) => user,
-        None => {
-            log_auth_failure(&state.db, &headers, "passkey_login_failed", &username, None).await?;
+    let mut maybe_user_id = None;
+    let credentials = if let Some(raw_username) = payload.username {
+        let username = normalize_username(&raw_username)?;
+        tracing::debug!(?username, "starting passkey authentication for specific user");
+        let user = match find_user_by_username(&state.db, &username).await? {
+            Some(user) => user,
+            None => {
+                log_auth_failure(&state.db, &headers, "passkey_login_failed", &username, None).await?;
+                return Err(AuthError::Unauthorized("invalid credentials".to_string()));
+            }
+        };
+
+        maybe_user_id = Some(user.id);
+        let mut tx = state
+            .db
+            .begin()
+            .await
+            .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+        cleanup_expired_webauthn_state(&mut tx).await?;
+        sqlx::query("DELETE FROM auth_webauthn_authentication WHERE user_id = $1")
+            .bind(user.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|error| AuthError::Internal(error.to_string()))?;
+
+        let passkeys = list_passkey_records_by_user(&mut tx, user.id).await?;
+        let creds = passkeys
+            .iter()
+            .map(|record| record.passkey())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        if creds.is_empty() {
+            tracing::debug!(?username, "no passkeys found for user");
+            tx.rollback()
+                .await
+                .map_err(|error| AuthError::Internal(error.to_string()))?;
+            log_auth_failure(
+                &state.db,
+                &headers,
+                "passkey_login_failed",
+                &username,
+                Some(user.id),
+            )
+            .await?;
             return Err(AuthError::Unauthorized("invalid credentials".to_string()));
         }
+        tx.commit()
+            .await
+            .map_err(|error| AuthError::Internal(error.to_string()))?;
+        creds
+    } else {
+        tracing::debug!("starting discoverable passkey authentication");
+        Vec::new()
     };
 
     let context = request_context(&headers, payload.device_name);
@@ -1127,38 +1187,38 @@ pub async fn start_passkey_authentication(
         .map_err(|error| AuthError::Internal(error.to_string()))?;
 
     cleanup_expired_webauthn_state(&mut tx).await?;
-    sqlx::query("DELETE FROM auth_webauthn_authentication WHERE user_id = $1")
-        .bind(user.id)
-        .execute(&mut *tx)
-        .await
-        .map_err(|error| AuthError::Internal(error.to_string()))?;
 
-    let passkeys = list_passkey_records_by_user(&mut tx, user.id).await?;
-    let credentials = passkeys
-        .iter()
-        .map(|record| record.passkey())
-        .collect::<Result<Vec<_>, _>>()?;
-
-    if credentials.is_empty() {
-        tx.rollback()
-            .await
-            .map_err(|error| AuthError::Internal(error.to_string()))?;
-        log_auth_failure(
-            &state.db,
-            &headers,
-            "passkey_login_failed",
-            &username,
-            Some(user.id),
+    let (options, ceremony_state) = if maybe_user_id.is_some() {
+        let (options, ceremony_state) = state
+            .auth
+            .webauthn()
+            .start_passkey_authentication(&credentials)
+            .map_err(|error| {
+                tracing::error!(?error, "webauthn start_passkey_authentication failed");
+                map_webauthn_error(error)
+            })?;
+        (
+            options,
+            serde_json::to_value(&ceremony_state)
+                .map_err(|error| AuthError::Internal(error.to_string()))?,
         )
-        .await?;
-        return Err(AuthError::Unauthorized("invalid credentials".to_string()));
-    }
+    } else {
+        let (options, ceremony_state) = state
+            .auth
+            .webauthn()
+            .start_discoverable_authentication()
+            .map_err(|error| {
+                tracing::error!(?error, "webauthn start_discoverable_authentication failed");
+                map_webauthn_error(error)
+            })?;
+        (
+            options,
+            serde_json::to_value(&ceremony_state)
+                .map_err(|error| AuthError::Internal(error.to_string()))?,
+        )
+    };
 
-    let (options, ceremony_state) = state
-        .auth
-        .webauthn()
-        .start_passkey_authentication(&credentials)
-        .map_err(map_webauthn_error)?;
+    tracing::debug!(?options, "webauthn request options generated");
 
     let ceremony_id = Uuid::now_v7();
     let expires_at = Utc::now() + Duration::minutes(WEBAUTHN_STATE_TTL_MINUTES);
@@ -1169,9 +1229,9 @@ pub async fn start_passkey_authentication(
         "#,
     )
     .bind(ceremony_id)
-    .bind(user.id)
+    .bind(maybe_user_id)
     .bind(&context.device_name)
-    .bind(serde_json::to_value(&ceremony_state).map_err(|error| AuthError::Internal(error.to_string()))?)
+    .bind(ceremony_state)
     .bind(expires_at)
     .execute(&mut *tx)
     .await
@@ -1225,15 +1285,63 @@ pub async fn finish_passkey_authentication(
         ));
     }
 
-    let ceremony_state: PasskeyAuthentication = serde_json::from_value(record.state)
-        .map_err(|error| AuthError::Internal(error.to_string()))?;
-    let auth_result = state
-        .auth
-        .webauthn()
-        .finish_passkey_authentication(&payload.credential, &ceremony_state)
-        .map_err(|_| AuthError::Unauthorized("invalid credentials".to_string()))?;
+    let (user_id, auth_result) = match record.user_id {
+        Some(user_id) => {
+            let ceremony_state: PasskeyAuthentication = serde_json::from_value(record.state)
+                .map_err(|error| AuthError::Internal(error.to_string()))?;
+            let auth_result = state
+                .auth
+                .webauthn()
+                .finish_passkey_authentication(&payload.credential, &ceremony_state)
+                .map_err(|error| {
+                    tracing::error!(?error, "finish_passkey_authentication webauthn validation failed");
+                    AuthError::Unauthorized("invalid credentials".to_string())
+                })?;
+            (user_id, auth_result)
+        }
+        None => {
+            let ceremony_state: DiscoverableAuthentication =
+                serde_json::from_value(record.state)
+                    .map_err(|error| AuthError::Internal(error.to_string()))?;
+            let (user_id, credential_id) = state
+                .auth
+                .webauthn()
+                .identify_discoverable_authentication(&payload.credential)
+                .map_err(|error| {
+                    tracing::error!(?error, "identify_discoverable_authentication failed");
+                    AuthError::Unauthorized("invalid credentials".to_string())
+                })?;
 
-    let mut passkeys = list_passkey_records_by_user(&mut tx, record.user_id).await?;
+            let passkeys = list_passkey_records_by_user(&mut tx, user_id).await?;
+            let matched_credential_id = URL_SAFE_NO_PAD.encode(credential_id);
+            if !passkeys
+                .iter()
+                .any(|record| record.credential_id == matched_credential_id)
+            {
+                return Err(AuthError::Unauthorized("invalid credentials".to_string()));
+            }
+
+            let discoverable_keys = passkeys
+                .iter()
+                .map(|record| record.passkey().map(DiscoverableKey::from))
+                .collect::<Result<Vec<_>, _>>()?;
+            let auth_result = state
+                .auth
+                .webauthn()
+                .finish_discoverable_authentication(
+                    &payload.credential,
+                    ceremony_state,
+                    &discoverable_keys,
+                )
+                .map_err(|error| {
+                    tracing::error!(?error, "finish_discoverable_authentication webauthn validation failed");
+                    AuthError::Unauthorized("invalid credentials".to_string())
+                })?;
+            (user_id, auth_result)
+        }
+    };
+
+    let mut passkeys = list_passkey_records_by_user(&mut tx, user_id).await?;
     if passkeys.is_empty() {
         return Err(AuthError::Unauthorized("invalid credentials".to_string()));
     }
@@ -1253,7 +1361,7 @@ pub async fn finish_passkey_authentication(
         }
     }
 
-    let user = find_user_by_id(&mut tx, record.user_id).await?;
+    let user = find_user_by_id(&mut tx, user_id).await?;
     let context = request_context(&headers, record.device_name);
     let session = create_session(&mut tx, &user, &context).await?;
     sqlx::query(
@@ -1263,7 +1371,7 @@ pub async fn finish_passkey_authentication(
         WHERE user_id = $1 AND credential_id = $3
         "#,
     )
-    .bind(record.user_id)
+    .bind(user_id)
     .bind(session.id)
     .bind(&matched_credential_id)
     .execute(&mut *tx)

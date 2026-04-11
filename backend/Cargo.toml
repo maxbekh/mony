@@ -28,7 +28,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
 url = "2.5.7"
 uuid = { version = "1.13.2", features = ["v4", "v7", "serde"] }
-webauthn-rs = { version = "0.5.4", features = ["danger-allow-state-serialisation"] }
+webauthn-rs = { version = "0.5.4", features = ["danger-allow-state-serialisation", "conditional-ui"] }
 
 [dev-dependencies]
 tower = { version = "0.5.2", features = ["util"] }
