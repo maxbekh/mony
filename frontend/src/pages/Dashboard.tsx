@@ -842,78 +842,79 @@ const Dashboard: React.FC = () => {
           justify-content: space-between;
           gap: 1rem;
           align-items: baseline;
-          padding: 1rem 1.1rem;
-          border-radius: 1rem;
+          padding: 1.25rem;
+          border-radius: 1.25rem;
           background:
             var(--surface-reflection),
-            radial-gradient(circle at top left, color-mix(in srgb, var(--primary-color) 16%, transparent), transparent 36%),
+            radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--primary-color) 12%, transparent), transparent 45%),
             var(--surface-muted);
           border: 1px solid var(--border-color);
         }
         .comparison-window span {
           color: var(--text-muted);
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           text-transform: uppercase;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.1em;
+          font-weight: 700;
+        }
+        .comparison-window strong {
+          font-weight: 700;
         }
         .comparison-strip {
           display: grid;
-          grid-template-columns: minmax(0, 1.15fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+          grid-template-columns: repeat(3, 1fr);
           align-items: stretch;
-          gap: 0;
+          gap: 1.5rem;
+          padding: 1.5rem 0;
           border-top: 1px solid var(--border-color);
           border-bottom: 1px solid var(--border-color);
         }
         .comparison-metric {
           display: flex;
           flex-direction: column;
-          gap: 0.45rem;
-          padding: 1.1rem 1rem;
+          gap: 0.5rem;
           min-width: 0;
-        }
-        .comparison-metric.major {
-          padding-left: 0;
         }
         .metric-label {
           color: var(--text-muted);
-          font-size: 0.74rem;
+          font-size: 0.7rem;
           text-transform: uppercase;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.1em;
+          font-weight: 700;
         }
         .metric-value {
-          font-size: 1.35rem;
-          line-height: 1.1;
+          font-size: 1.5rem;
+          line-height: 1;
+          font-weight: 800;
+          letter-spacing: -0.01em;
         }
         .metric-baseline {
           color: var(--text-muted);
-          font-size: 0.8rem;
+          font-size: 0.85rem;
         }
         .comparison-divider {
-          width: 1px;
-          background: var(--border-color);
-          align-self: stretch;
-          margin: 0.65rem 0;
+          display: none;
         }
         .delta-pill {
           display: inline-flex;
           align-items: center;
-          gap: 0.45rem;
+          gap: 0.5rem;
           width: fit-content;
-          padding: 0.45rem 0.7rem;
-          border-radius: 999px;
-          font-size: 0.78rem;
-          font-weight: 600;
+          padding: 0.4rem 0.75rem;
+          border-radius: 2rem;
+          font-size: 0.8rem;
+          font-weight: 800;
           border: 1px solid transparent;
         }
         .delta-pill.up {
-          background: color-mix(in srgb, var(--danger-bg) 82%, white 18%);
-          color: var(--danger-text);
-          border-color: color-mix(in srgb, var(--danger-border) 72%, transparent);
+          background: color-mix(in srgb, var(--negative-color) 12%, transparent);
+          color: var(--negative-color);
+          border-color: color-mix(in srgb, var(--negative-color) 20%, transparent);
         }
         .delta-pill.down {
-          background: color-mix(in srgb, var(--success-surface) 84%, white 16%);
-          color: var(--success-text);
-          border-color: color-mix(in srgb, var(--success-text) 24%, transparent);
+          background: color-mix(in srgb, var(--positive-color) 12%, transparent);
+          color: var(--positive-color);
+          border-color: color-mix(in srgb, var(--positive-color) 20%, transparent);
         }
         .delta-pill.flat {
           background: var(--surface-muted);
@@ -923,49 +924,64 @@ const Dashboard: React.FC = () => {
         .movers-section {
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
+          gap: 1rem;
         }
         .movers-title-row {
           display: flex;
           justify-content: space-between;
           gap: 1rem;
           align-items: baseline;
-          flex-wrap: wrap;
         }
         .movers-title-row h3 {
-          font-size: 0.95rem;
-        }
-        .movers-title-row span,
-        .mover-meta {
+          font-size: 0.875rem;
           color: var(--text-muted);
-          font-size: 0.78rem;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          font-weight: 700;
+        }
+        .movers-title-row span {
+          color: var(--text-muted);
+          font-size: 0.8rem;
         }
         .mover-list {
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
+          gap: 1rem;
         }
         .mover-item {
           display: flex;
           justify-content: space-between;
-          gap: 1rem;
+          gap: 1.5rem;
           align-items: center;
-          padding: 1rem 0;
-          border-radius: 0;
-          border: none;
-          border-bottom: 1px solid var(--border-color);
-          background: transparent;
+          padding: 1.25rem;
+          border-radius: 1.25rem;
+          border: 1px solid var(--border-color);
+          background: var(--surface-color);
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .mover-list .mover-item:last-child {
-          border-bottom: none;
+        .mover-item:hover {
+          transform: translateY(-4px);
+          box-shadow: var(--shadow-soft);
+          border-color: var(--text-muted);
         }
         .mover-item.rise {
           background:
-            linear-gradient(90deg, color-mix(in srgb, var(--danger-bg) 58%, transparent), transparent 38%);
+            var(--surface-reflection),
+            radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--negative-color) 8%, transparent), transparent 45%),
+            var(--surface-color);
+          border-color: color-mix(in srgb, var(--negative-color) 15%, var(--border-color));
         }
         .mover-item.calm {
           background:
-            linear-gradient(90deg, color-mix(in srgb, var(--success-surface) 58%, transparent), transparent 38%);
+            var(--surface-reflection),
+            radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--positive-color) 8%, transparent), transparent 45%),
+            var(--surface-color);
+          border-color: color-mix(in srgb, var(--positive-color) 15%, var(--border-color));
+        }
+        .mover-meta {
+          color: var(--text-muted);
+          font-size: 0.85rem;
+          margin-top: 0.25rem;
         }
         .card-body {
           padding: 1.5rem;

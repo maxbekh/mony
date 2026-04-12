@@ -815,7 +815,7 @@ const Transactions: React.FC = () => {
           background:
             var(--surface-reflection),
             var(--surface-muted);
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+          box-shadow: inset 0 1px 0 color-mix(in srgb, var(--border-color), transparent 50%);
         }
         .inline-category-header {
           display: flex;

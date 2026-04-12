@@ -735,39 +735,51 @@ const Analytics: React.FC = () => {
         }
         .spend-lead {
           background:
-            linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.4)),
-            radial-gradient(circle at top left, rgba(239, 68, 68, 0.12), transparent 34%),
+            var(--surface-reflection),
+            radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--negative-color) 12%, transparent), transparent 45%),
             var(--surface-color);
+          border: 1px solid color-mix(in srgb, var(--negative-color) 15%, var(--border-color));
         }
         .trend-lead {
           background:
-            linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.4)),
-            radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 34%),
+            var(--surface-reflection),
+            radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--primary-color) 12%, transparent), transparent 45%),
             var(--surface-color);
+          border: 1px solid color-mix(in srgb, var(--primary-color) 20%, var(--border-color));
         }
         .mix-lead {
           background:
-            linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(255, 255, 255, 0.4)),
-            radial-gradient(circle at top left, rgba(59, 130, 246, 0.13), transparent 34%),
+            var(--surface-reflection),
+            radial-gradient(circle at 0% 0%, color-mix(in srgb, #3b82f6 10%, transparent), transparent 45%),
             var(--surface-color);
+          border: 1px solid color-mix(in srgb, #3b82f6 15%, var(--border-color));
+        }
+        .spotlight-card .card-header {
+          border-bottom: none;
+          padding-bottom: 0;
         }
         .spotlight-body {
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
+          gap: 0.5rem;
         }
         .spotlight-title {
-          font-size: 1rem;
+          font-size: 0.875rem;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          font-weight: 700;
         }
         .spotlight-amount {
-          font-size: 1.7rem;
+          font-size: 2.25rem;
           line-height: 1;
           font-weight: 800;
+          letter-spacing: -0.02em;
         }
         .spotlight-copy {
           color: var(--text-muted);
-          font-size: 0.9rem;
-          line-height: 1.45;
+          font-size: 0.95rem;
+          line-height: 1.5;
         }
         .mix-list {
           display: flex;
